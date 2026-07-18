@@ -34,7 +34,7 @@ class PythonCodeGenerator {
                 appendLine("from docx.shared import Inches, Pt")
                 appendLine()
             }
-            if (files.any { it.mimeType.contains("sheet") || it.mimeType.contains("excel") || it.mimeType.contains("csv")) {
+            if (files.any { it.mimeType.contains("sheet") || it.mimeType.contains("excel") || it.mimeType.contains("csv") }) {
                 appendLine("from openpyxl import Workbook, load_workbook")
                 appendLine()
             }

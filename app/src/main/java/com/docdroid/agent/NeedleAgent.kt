@@ -3,7 +3,6 @@ package com.docdroid.agent
 import com.cactus.cactusInit
 import com.cactus.cactusComplete
 import com.cactus.cactusDestroy
-import com.docdroid.model.ToolCall as ModelToolCall
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -24,7 +23,7 @@ class NeedleAgent {
         }
     }
 
-    suspend fun query(query: String, toolsJson: String): Result<List<ModelToolCall>> =
+    suspend fun query(query: String, toolsJson: String): Result<List<ToolCall>> =
         withContext(Dispatchers.IO) {
             if (!initialized) {
                 return@withContext Result.failure(Exception("Needle model not initialized"))
@@ -52,7 +51,7 @@ class NeedleAgent {
             }
         }
 
-    private fun parseResponse(responseJson: String): List<ModelToolCall> {
+    private fun parseResponse(responseJson: String): List<ToolCall> {
         return try {
             val trimmed = responseJson.trim()
             val json = if (trimmed.startsWith("[")) {
@@ -67,7 +66,7 @@ class NeedleAgent {
                 }
             }
 
-            val calls = mutableListOf<ModelToolCall>()
+            val calls = mutableListOf<ToolCall>()
             for (i in 0 until json.length()) {
                 val item = json.getJSONObject(i)
                 val name = item.optString("name", "")
@@ -78,7 +77,7 @@ class NeedleAgent {
                 argsObj?.keys()?.forEach { key ->
                     args[key] = argsObj.optString(key, "")
                 }
-                calls.add(ModelToolCall(name = name, arguments = args))
+                calls.add(ToolCall(name = name, arguments = args))
             }
             calls
         } catch (e: Exception) {
@@ -87,8 +86,8 @@ class NeedleAgent {
         }
     }
 
-    private fun extractToolCallsFromText(text: String): List<ModelToolCall> {
-        val calls = mutableListOf<ModelToolCall>()
+    private fun extractToolCallsFromText(text: String): List<ToolCall> {
+        val calls = mutableListOf<ToolCall>()
         val pattern = Regex("""(\w+)\(([^)]*)\)""")
         pattern.findAll(text).forEach { match ->
             val name = match.groupValues[1]
@@ -100,7 +99,7 @@ class NeedleAgent {
                     args[parts[0].trim()] = parts[1].trim().removeSurrounding("\"").removeSurrounding("'")
                 }
             }
-            calls.add(ModelToolCall(name = name, arguments = args))
+            calls.add(ToolCall(name = name, arguments = args))
         }
         return calls
     }
