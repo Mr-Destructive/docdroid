@@ -35,7 +35,7 @@ fun buildToolsJson(): String {
                 append(""""$key":{""")
                 append(""""type":"${param.type}","description":${escapeJson(param.description)},"required":${param.required}""")
                 if (param.enum != null) {
-                    append(",""enum"":[${param.enum.joinToString(",") { """"$it"""" }}]")
+                    append(",\"enum\":[${param.enum.joinToString(",") { "\"$it\"" }}]")
                 }
                 append("}")
             }
