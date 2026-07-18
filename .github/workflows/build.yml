@@ -52,7 +52,7 @@ jobs:
       - name: Convert Needle weights
         run: |
           cd /tmp/cactus
-          bash -c "source ./setup && cactus convert needle /tmp/needle-weights"
+          bash -c "source ./setup && cactus convert Cactus-Compute/needle /tmp/needle-weights"
           mkdir -p $GITHUB_WORKSPACE/app/src/main/assets/
           cp /tmp/needle-weights/needle.cact $GITHUB_WORKSPACE/app/src/main/assets/
 
