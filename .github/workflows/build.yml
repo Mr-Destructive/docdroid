@@ -51,11 +51,12 @@ jobs:
 
       - name: Download Needle bundle
         run: |
-          cd /tmp/cactus
-          bash -c "source ./setup && cactus download Cactus-Compute/needle /tmp/needle-bundle"
           mkdir -p $GITHUB_WORKSPACE/app/src/main/assets/
-          cp /tmp/needle-bundle/*.cact $GITHUB_WORKSPACE/app/src/main/assets/ || true
-          ls -la /tmp/needle-bundle/
+          cd /tmp
+          wget -q "https://huggingface.co/Cactus-Compute/needle/resolve/main/needle-cq4.zip" -O needle-cq4.zip
+          unzip -o needle-cq4.zip -d needle-bundle
+          find needle-bundle -type f | head -20
+          find needle-bundle -name "*.cact" -exec cp {} $GITHUB_WORKSPACE/app/src/main/assets/ \;
           ls -la $GITHUB_WORKSPACE/app/src/main/assets/
 
       - name: Generate Gradle wrapper
