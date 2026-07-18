@@ -103,21 +103,20 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @Suppress("DEPRECATION")
     private fun getUriExtraCompat(intent: Intent, key: String): Uri? {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             intent.getParcelableExtra(key, Uri::class.java)
         } else {
-            @Suppress("DEPRECATION")
             intent.getParcelableExtra(key)
         }
     }
 
-    @Suppress("UNCHECKED_CAST")
+    @Suppress("UNCHECKED_CAST", "DEPRECATION")
     private fun getUriArrayListExtraCompat(intent: Intent, key: String): ArrayList<Uri>? {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             intent.getParcelableArrayListExtra(key, Uri::class.java)
         } else {
-            @Suppress("DEPRECATION")
             intent.getParcelableArrayListExtra(key) as? ArrayList<Uri>
         }
     }
