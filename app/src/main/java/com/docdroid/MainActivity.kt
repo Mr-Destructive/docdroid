@@ -114,11 +114,10 @@ class MainActivity : ComponentActivity() {
 
     @Suppress("UNCHECKED_CAST", "DEPRECATION")
     private fun getUriArrayListExtraCompat(intent: Intent, key: String): ArrayList<Uri>? {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            intent.getParcelableArrayListExtra(key, Uri::class.java)
-        } else {
-            intent.getParcelableArrayListExtra(key) as? ArrayList<Uri>
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            return intent.getParcelableArrayListExtra(key, Uri::class.java)
         }
+        return (intent.getParcelableArrayListExtra<android.os.Parcelable>(key) as? ArrayList<Uri>)
     }
 
     private fun uriToFile(uri: Uri): DocumentFile? {
