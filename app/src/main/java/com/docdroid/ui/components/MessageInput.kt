@@ -1,6 +1,5 @@
 package com.docdroid.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -10,7 +9,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.docdroid.ui.theme.*
@@ -20,18 +18,19 @@ fun MessageInput(
     onSendMessage: (String) -> Unit,
     onAttachFiles: () -> Unit,
     isLoading: Boolean = false,
+    text: String = "",
+    onTextChange: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    var text by remember { mutableStateOf("") }
-
     Surface(
         modifier = modifier.fillMaxWidth(),
         tonalElevation = 3.dp,
-        shadowElevation = 4.dp
+        shadowElevation = 4.dp,
+        color = Surface
     ) {
         Row(
             modifier = Modifier
-                .padding(horizontal = 8.dp, vertical = 6.dp)
+                .padding(horizontal = 8.dp, vertical = 8.dp)
                 .fillMaxWidth(),
             verticalAlignment = Alignment.Bottom
         ) {
@@ -48,34 +47,45 @@ fun MessageInput(
 
             OutlinedTextField(
                 value = text,
-                onValueChange = { text = it },
+                onValueChange = onTextChange,
                 modifier = Modifier
                     .weight(1f)
-                    .heightIn(min = 44.dp, max = 120.dp),
-                placeholder = { Text("Describe what you want to do...", color = ThinkingColor) },
-                shape = RoundedCornerShape(20.dp),
+                    .heightIn(min = 48.dp, max = 120.dp),
+                placeholder = {
+                    Text(
+                        "Describe what you want to do...",
+                        color = ThinkingColor
+                    )
+                },
+                shape = RoundedCornerShape(24.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = Primary,
-                    unfocusedBorderColor = Color.LightGray
+                    unfocusedBorderColor = Color(0xFFE0E0E0),
+                    focusedContainerColor = Color(0xFFFAFAFA),
+                    unfocusedContainerColor = Color(0xFFFAFAFA)
                 ),
                 maxLines = 4
             )
 
             Spacer(modifier = Modifier.width(4.dp))
 
-            IconButton(
+            FilledIconButton(
                 onClick = {
                     if (text.isNotBlank()) {
                         onSendMessage(text.trim())
-                        text = ""
                     }
                 },
-                enabled = text.isNotBlank() && !isLoading
+                enabled = text.isNotBlank() && !isLoading,
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = if (text.isNotBlank() && !isLoading) Primary else Color(0xFFE0E0E0),
+                    contentColor = if (text.isNotBlank() && !isLoading) Color.White else ThinkingColor
+                ),
+                modifier = Modifier.size(44.dp)
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.Send,
                     contentDescription = "Send",
-                    tint = if (text.isNotBlank() && !isLoading) Primary else ThinkingColor
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }
