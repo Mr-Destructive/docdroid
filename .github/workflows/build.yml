@@ -49,12 +49,14 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/app/src/main/jniLibs/arm64-v8a/
           cp android/libcactus_engine.so $GITHUB_WORKSPACE/app/src/main/jniLibs/arm64-v8a/
 
-      - name: Convert Needle weights
+      - name: Download Needle bundle
         run: |
           cd /tmp/cactus
-          bash -c "source ./setup && cactus convert Cactus-Compute/needle /tmp/needle-weights"
+          bash -c "source ./setup && cactus download Cactus-Compute/needle /tmp/needle-bundle"
           mkdir -p $GITHUB_WORKSPACE/app/src/main/assets/
-          cp /tmp/needle-weights/needle.cact $GITHUB_WORKSPACE/app/src/main/assets/
+          cp /tmp/needle-bundle/*.cact $GITHUB_WORKSPACE/app/src/main/assets/ || true
+          ls -la /tmp/needle-bundle/
+          ls -la $GITHUB_WORKSPACE/app/src/main/assets/
 
       - name: Generate Gradle wrapper
         run: gradle wrapper --gradle-version 8.11.1
