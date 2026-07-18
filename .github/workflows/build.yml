@@ -70,6 +70,9 @@ jobs:
       - name: Build Release APK
         run: ./gradlew assembleRelease --no-daemon
 
+      - name: Install build-tools
+        run: sdkmanager "build-tools;35.0.0"
+
       - name: Sign APK
         run: |
           keytool -genkeypair -v -keystore /tmp/release.keystore \
@@ -81,8 +84,8 @@ jobs:
           else
             cp app/build/outputs/apk/release/app-release.apk /tmp/app-release.apk
           fi
-          zipalign -v 4 /tmp/app-release.apk /tmp/app-release-aligned.apk
-          apksigner sign \
+          ${ANDROID_HOME}/build-tools/35.0.0/zipalign -v 4 /tmp/app-release.apk /tmp/app-release-aligned.apk
+          ${ANDROID_HOME}/build-tools/35.0.0/apksigner sign \
             --ks /tmp/release.keystore \
             --ks-pass pass:docdroid123 \
             --key-pass pass:docdroid123 \
