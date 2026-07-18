@@ -1,5 +1,6 @@
 package com.docdroid.agent
 
+import android.content.Context
 import com.cactus.cactusInit
 import com.cactus.cactusComplete
 import com.cactus.cactusDestroy
@@ -7,23 +8,75 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 
-class NeedleAgent {
+interface NeedleEngine {
+    fun isInitialized(): Boolean
+    suspend fun query(query: String, toolsJson: String): Result<List<ToolCall>>
+    fun getInitError(): String? = null
+}
+
+class NeedleAgent : NeedleEngine {
 
     private var modelHandle: Long = 0L
     private var initialized = false
+    private var initError: String? = null
 
     fun init(modelPath: String) {
         try {
             modelHandle = cactusInit(modelPath, null, false)
             initialized = true
+            initError = null
+            android.util.Log.i(TAG, "Model loaded from $modelPath")
         } catch (e: Exception) {
             initialized = false
-            android.util.Log.e(TAG, "Failed to init Cactus: ${e.message}")
+            initError = e.message
+            android.util.Log.e(TAG, "Failed to init Cactus: ${e.message}", e)
         }
     }
 
-    suspend fun query(query: String, toolsJson: String): Result<List<ToolCall>> =
+    suspend fun initFromAssets(context: Context): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val modelDir = File(context.filesDir, "models")
+            modelDir.mkdirs()
+
+            val assetFiles = context.assets.list("") ?: emptyArray()
+            val cactFiles = assetFiles.filter { it.endsWith(".cact") }
+
+            if (cactFiles.isEmpty()) {
+                android.util.Log.w(TAG, "No .cact model files found in assets")
+                initError = "No model files in APK assets"
+                return@withContext false
+            }
+
+            val assetName = cactFiles.first()
+            val destFile = File(modelDir, assetName)
+
+            if (!destFile.exists() || destFile.length() == 0L) {
+                android.util.Log.i(TAG, "Extracting $assetName to ${destFile.absolutePath}")
+                context.assets.open(assetName).use { input ->
+                    destFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+            }
+
+            android.util.Log.i(TAG, "Model file ready: ${destFile.absolutePath} (${destFile.length()} bytes)")
+            init(destFile.absolutePath)
+            initialized
+        } catch (e: Exception) {
+            initialized = false
+            initError = "Asset extraction failed: ${e.message}"
+            android.util.Log.e(TAG, "Failed to extract model from assets", e)
+            false
+        }
+    }
+
+    override fun isInitialized(): Boolean = initialized
+
+    override fun getInitError(): String? = initError
+
+    override suspend fun query(query: String, toolsJson: String): Result<List<ToolCall>> =
         withContext(Dispatchers.IO) {
             if (!initialized) {
                 return@withContext Result.failure(Exception("Needle model not initialized"))
@@ -110,8 +163,6 @@ class NeedleAgent {
             initialized = false
         }
     }
-
-    fun isInitialized(): Boolean = initialized
 
     companion object {
         private const val TAG = "NeedleAgent"

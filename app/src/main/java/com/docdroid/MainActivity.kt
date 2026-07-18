@@ -2,12 +2,12 @@ package com.docdroid
 
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.ui.Modifier
 import com.docdroid.agent.*
 import com.docdroid.data.ChatRepository
 import com.docdroid.data.FileStore
@@ -15,12 +15,17 @@ import com.docdroid.model.DocumentFile
 import com.docdroid.python.PythonBridge
 import com.docdroid.ui.screens.ChatScreen
 import com.docdroid.ui.theme.DocDroidTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
     private lateinit var agentLoop: AgentLoop
     private lateinit var repository: ChatRepository
     private lateinit var fileStore: FileStore
+    private lateinit var needleAgent: NeedleAgent
+    private val activityScope = CoroutineScope(Dispatchers.Main)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,13 +37,27 @@ class MainActivity : ComponentActivity() {
 
         PythonBridge.init(this)
 
-        val needleAgent = NeedleAgent()
+        needleAgent = NeedleAgent()
         val dispatcher = ToolDispatcher(app.toolRegistry)
         val pythonCodeGenerator = PythonCodeGenerator()
 
         agentLoop = AgentLoop(needleAgent, dispatcher, pythonCodeGenerator)
 
         registerToolHandlers(app.toolRegistry)
+
+        activityScope.launch {
+            val success = needleAgent.initFromAssets(this@MainActivity)
+            if (success) {
+                Log.i(TAG, "Needle model initialized successfully")
+            } else {
+                Log.w(TAG, "Needle model init failed: ${needleAgent.getInitError()}")
+                repository.addSystemMessage(
+                    "Note: AI model could not be loaded. " +
+                    "Check that the model file is included in the APK. " +
+                    "Error: ${needleAgent.getInitError()}"
+                )
+            }
+        }
 
         handleIncomingIntent(intent)
 
@@ -68,14 +87,14 @@ class MainActivity : ComponentActivity() {
                 }
             }
             Intent.ACTION_SEND -> {
-                val uri = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM) ?: return
+                val uri = getUriExtraCompat(intent, Intent.EXTRA_STREAM) ?: return
                 val file = uriToFile(uri)
                 if (file != null) {
                     repository.addSystemMessage("Shared file: ${file.name}")
                 }
             }
             Intent.ACTION_SEND_MULTIPLE -> {
-                val uris = intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM) ?: return
+                val uris = getUriArrayListExtraCompat(intent, Intent.EXTRA_STREAM) ?: return
                 uris.forEach { uri ->
                     uriToFile(uri)
                 }
@@ -84,22 +103,43 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun getUriExtraCompat(intent: Intent, key: String): Uri? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableExtra(key, Uri::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableExtra(key)
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun getUriArrayListExtraCompat(intent: Intent, key: String): ArrayList<Uri>? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableArrayListExtra(key, Uri::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableArrayListExtra(key) as? ArrayList<Uri>
+        }
+    }
+
     private fun uriToFile(uri: Uri): DocumentFile? {
         return try {
-            val cursor = contentResolver.query(uri, null, null, null, null)
-            val name = cursor?.use {
-                it.moveToFirst()
-                it.getColumnIndexOrThrow(android.provider.OpenableColumns.DISPLAY_NAME).let { idx ->
-                    it.getString(idx)
-                }
-            } ?: uri.lastPathSegment ?: "unknown"
-            val size = cursor?.use {
-                it.moveToFirst()
-                it.getColumnIndexOrThrow(android.provider.OpenableColumns.SIZE).let { idx ->
-                    it.getLong(idx)
-                }
-            } ?: 0L
+            var name = uri.lastPathSegment ?: "unknown"
+            var size = 0L
             val mimeType = contentResolver.getType(uri) ?: "application/octet-stream"
+
+            contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val nameIdx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (nameIdx >= 0) {
+                        name = cursor.getString(nameIdx) ?: name
+                    }
+                    val sizeIdx = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
+                    if (sizeIdx >= 0) {
+                        size = cursor.getLong(sizeIdx)
+                    }
+                }
+            }
 
             val copiedFile = fileStore.copyUriToFile(uri, name)
             DocumentFile(
@@ -110,18 +150,14 @@ class MainActivity : ComponentActivity() {
                 uri = uri.toString()
             )
         } catch (e: Exception) {
+            Log.e(TAG, "Failed to resolve file from URI: ${e.message}")
             null
         }
     }
 
     private fun handlePickedFiles(files: List<DocumentFile>) {
         files.forEach { file ->
-            if (file.uri.isNotEmpty()) {
-                try {
-                    val uri = Uri.parse(file.uri)
-                    val copiedFile = fileStore.copyUriToFile(uri, file.name)
-                } catch (_: Exception) {}
-            }
+            Log.d(TAG, "Picked file: ${file.name} -> ${file.path}")
         }
     }
 
@@ -198,5 +234,9 @@ class MainActivity : ComponentActivity() {
             )
             PythonBridge.executeArbitraryPython(code)
         }
+    }
+
+    companion object {
+        private const val TAG = "MainActivity"
     }
 }

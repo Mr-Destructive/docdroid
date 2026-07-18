@@ -14,6 +14,13 @@ mlkitImageLabeling = "17.0.9"
 mlkitFaceDetection = "16.1.7"
 coil = "2.7.0"
 camerax = "1.4.1"
+junit = "4.13.2"
+coroutinesTest = "1.9.0"
+turbine = "1.2.0"
+mockk = "1.13.13"
+androidxJunit = "1.2.1"
+espresso = "3.6.1"
+junitExt = "1.2.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -46,6 +53,17 @@ camerax-core = { group = "androidx.camera", name = "camera-core", version.ref = 
 camerax-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
 camerax-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
 camerax-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
+
+# Testing
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutinesTest" }
+kotlinx-serialization-json-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serializationJson" }
+turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
+mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
+androidx-test-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitExt" }
+androidx-test-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espresso" }
+androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxJunit" }
+androidx-test-core = { group = "androidx.test", name = "core", version.ref = "androidxJunit" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

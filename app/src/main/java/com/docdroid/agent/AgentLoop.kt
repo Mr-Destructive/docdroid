@@ -15,7 +15,7 @@ sealed class AgentEvent {
 }
 
 class AgentLoop(
-    private val needleAgent: NeedleAgent,
+    private val needleAgent: NeedleEngine,
     private val dispatcher: ToolDispatcher,
     private val pythonCodeGenerator: PythonCodeGenerator
 ) {

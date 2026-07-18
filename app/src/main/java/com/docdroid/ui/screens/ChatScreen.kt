@@ -49,6 +49,46 @@ private val suggestionChips = listOf(
     SuggestionChip(Icons.Default.Code, "Run Python", "Run Python code to process my files"),
 )
 
+private fun resolveDocumentFile(context: android.content.Context, uri: Uri, workDir: java.io.File): DocumentFile? {
+    return try {
+        val resolver = context.contentResolver
+        val mimeType = resolver.getType(uri) ?: "application/octet-stream"
+        var name = uri.lastPathSegment ?: "unknown"
+        var size = 0L
+
+        resolver.query(uri, null, null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val nameIdx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (nameIdx >= 0) {
+                    name = cursor.getString(nameIdx) ?: name
+                }
+                val sizeIdx = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
+                if (sizeIdx >= 0) {
+                    size = cursor.getLong(sizeIdx)
+                }
+            }
+        }
+
+        val destFile = java.io.File(workDir, name)
+        resolver.openInputStream(uri)?.use { input ->
+            destFile.outputStream().use { output ->
+                input.copyTo(output)
+            }
+        }
+
+        DocumentFile(
+            name = name,
+            path = destFile.absolutePath,
+            mimeType = mimeType,
+            size = if (size > 0) size else destFile.length(),
+            uri = uri.toString()
+        )
+    } catch (e: Exception) {
+        android.util.Log.e("ChatScreen", "Failed to resolve document: ${e.message}")
+        null
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
@@ -80,32 +120,13 @@ fun ChatScreen(
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments()
     ) { uris: List<Uri> ->
-        val files = uris.map { uri ->
-            val cursor = context.contentResolver.query(uri, null, null, null, null)
-            val name = cursor?.use {
-                it.moveToFirst()
-                it.getColumnIndexOrThrow(android.provider.OpenableColumns.DISPLAY_NAME).let { idx ->
-                    it.getString(idx)
-                }
-            } ?: uri.lastPathSegment ?: "unknown"
-            val size = cursor?.use {
-                it.moveToFirst()
-                it.getColumnIndexOrThrow(android.provider.OpenableColumns.SIZE).let { idx ->
-                    it.getLong(idx)
-                }
-            } ?: 0L
-            val mimeType = context.contentResolver.getType(uri) ?: "application/octet-stream"
-
-            DocumentFile(
-                name = name,
-                path = uri.toString(),
-                mimeType = mimeType,
-                size = size,
-                uri = uri.toString()
-            )
+        if (uris.isNullOrEmpty()) return@rememberLauncherForActivityResult
+        val workDir = java.io.File(context.filesDir, "working").also { it.mkdirs() }
+        val files = uris.mapNotNull { uri -> resolveDocumentFile(context, uri, workDir) }
+        if (files.isNotEmpty()) {
+            pendingFiles = pendingFiles + files
+            onFilePicked(files)
         }
-        pendingFiles = pendingFiles + files
-        onFilePicked(files)
     }
 
     Scaffold(
@@ -151,7 +172,7 @@ fun ChatScreen(
                 contentPadding = PaddingValues(vertical = 8.dp)
             ) {
                 if (messages.isEmpty()) {
-                    item { WelcomeHeader() }
+                    item(key = "welcome") { WelcomeHeader() }
                 }
 
                 items(messages, key = { it.id }) { message ->
@@ -159,7 +180,7 @@ fun ChatScreen(
                 }
 
                 if (messages.size <= 1) {
-                    item {
+                    item(key = "suggestions") {
                         SuggestionChipsRow(
                             chips = suggestionChips,
                             onChipClick = { prompt ->
