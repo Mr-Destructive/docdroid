@@ -12,6 +12,8 @@ import com.docdroid.agent.*
 import com.docdroid.data.ChatRepository
 import com.docdroid.data.FileStore
 import com.docdroid.model.DocumentFile
+import com.docdroid.model.ToolResult
+import com.docdroid.model.ToolStatus
 import com.docdroid.python.PythonBridge
 import com.docdroid.ui.screens.ChatScreen
 import com.docdroid.ui.theme.DocDroidTheme
@@ -33,7 +35,7 @@ class MainActivity : ComponentActivity() {
 
         val app = application as DocDroidApp
         fileStore = app.fileStore
-        repository = ChatRepository()
+        repository = ChatRepository(this)
 
         PythonBridge.init(this)
 
@@ -159,79 +161,299 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun registerToolHandlers(registry: com.docdroid.agent.ToolRegistry) {
-        val pdfTools = listOf(
-            "merge_pdfs", "split_pdf", "extract_pages", "delete_pages",
-            "reorder_pages", "rotate_pages", "add_watermark_text",
-            "add_page_numbers", "extract_text", "extract_text_with_positions",
-            "extract_images", "extract_tables", "compress_pdf",
-            "encrypt_pdf", "decrypt_pdf", "fill_form", "add_bookmarks",
-            "extract_metadata", "set_metadata", "get_pdf_info",
-            "crop_pdf", "resize_pdf", "add_header_footer",
-            "overlay_pdfs", "flatten_pdf", "images_to_pdf",
-            "text_to_pdf", "create_form", "add_watermark_image"
-        )
-        pdfTools.forEach { tool ->
-            registry.register(tool) { args -> PythonBridge.executePdfTool(tool, args) }
+    private fun registerToolHandlers(registry: ToolRegistry) {
+        // --- PDF consolidated tools ---
+        registry.register("pdf_merge_split") { args ->
+            val op = args["operation"] ?: return@register toolError("pdf_merge_split", "No operation")
+            when (op) {
+                "merge" -> PythonBridge.executePdfTool("merge_pdfs", mapOf(
+                    "input_path" to (args["input_paths"] ?: ""),
+                    "output_path" to (args["output_path"] ?: "")
+                ))
+                "split" -> PythonBridge.executePdfTool("split_pdf", args)
+                else -> toolError("pdf_merge_split", "Unknown operation: $op")
+            }
         }
 
-        val imageTools = listOf(
-            "resize_image", "crop_image", "rotate_image", "flip_image",
-            "convert_image_format", "compress_image", "get_image_metadata",
-            "strip_image_metadata", "adjust_brightness", "adjust_contrast",
-            "adjust_saturation", "apply_image_filter", "add_text_overlay",
-            "add_image_overlay", "add_watermark_image", "generate_thumbnail",
-            "auto_enhance", "create_border", "change_dpi", "create_image",
-            "create_collage", "batch_resize", "batch_convert_format",
-            "draw_shapes", "generate_qr_code", "color_space_convert",
-            "label_image", "detect_faces", "remove_background", "batch_watermark"
-        )
-        imageTools.forEach { tool ->
-            registry.register(tool) { args -> PythonBridge.executeImageTool(tool, args) }
+        registry.register("pdf_pages") { args ->
+            val op = args["operation"] ?: return@register toolError("pdf_pages", "No operation")
+            when (op) {
+                "extract" -> PythonBridge.executePdfTool("extract_pages", args)
+                "delete" -> PythonBridge.executePdfTool("delete_pages", args)
+                "reorder" -> PythonBridge.executePdfTool("reorder_pages", args)
+                "rotate" -> PythonBridge.executePdfTool("rotate_pages", args)
+                else -> toolError("pdf_pages", "Unknown operation: $op")
+            }
         }
 
-        val textTools = listOf(
-            "read_text_file", "create_text_file", "find_replace_text",
-            "word_count", "read_docx", "create_docx", "edit_docx",
-            "docx_to_pdf", "extract_docx_images", "merge_docx",
-            "markdown_to_pdf", "html_to_text"
-        )
-        textTools.forEach { tool ->
-            registry.register(tool) { args -> PythonBridge.executeTextTool(tool, args) }
+        registry.register("pdf_crop_resize") { args ->
+            val op = args["operation"] ?: return@register toolError("pdf_crop_resize", "No operation")
+            when (op) {
+                "crop" -> PythonBridge.executePdfTool("crop_pdf", args)
+                "resize" -> PythonBridge.executePdfTool("resize_pdf", args)
+                else -> toolError("pdf_crop_resize", "Unknown operation: $op")
+            }
         }
 
-        val spreadsheetTools = listOf(
-            "read_spreadsheet", "create_spreadsheet", "edit_cell",
-            "csv_to_xlsx", "spreadsheet_to_pdf", "merge_spreadsheets",
-            "sort_spreadsheet"
-        )
-        spreadsheetTools.forEach { tool ->
-            registry.register(tool) { args -> PythonBridge.executeSpreadsheetTool(tool, args) }
+        registry.register("pdf_watermark") { args ->
+            val op = args["operation"] ?: return@register toolError("pdf_watermark", "No operation")
+            when (op) {
+                "text_watermark" -> PythonBridge.executePdfTool("add_watermark_text", args)
+                "image_watermark" -> PythonBridge.executePdfTool("add_watermark_image", args)
+                "page_numbers" -> PythonBridge.executePdfTool("add_page_numbers", args)
+                "header_footer" -> PythonBridge.executePdfTool("add_header_footer", args)
+                else -> toolError("pdf_watermark", "Unknown operation: $op")
+            }
         }
 
-        val presentationTools = listOf(
-            "read_presentation", "create_presentation",
-            "presentation_to_pdf", "get_presentation_info"
-        )
-        presentationTools.forEach { tool ->
-            registry.register(tool) { args -> PythonBridge.executePresentationTool(tool, args) }
+        registry.register("pdf_extract") { args ->
+            val op = args["operation"] ?: return@register toolError("pdf_extract", "No operation")
+            when (op) {
+                "text" -> PythonBridge.executePdfTool("extract_text", args)
+                "images" -> PythonBridge.executePdfTool("extract_images", args)
+                "tables" -> PythonBridge.executePdfTool("extract_tables", args)
+                "metadata" -> PythonBridge.executePdfTool("extract_metadata", args)
+                else -> toolError("pdf_extract", "Unknown operation: $op")
+            }
         }
 
-        val archiveTools = listOf(
-            "create_zip", "extract_zip", "list_archive_contents"
-        )
-        archiveTools.forEach { tool ->
-            registry.register(tool) { args -> PythonBridge.executeArchiveTool(tool, args) }
+        registry.register("pdf_security") { args ->
+            val op = args["operation"] ?: return@register toolError("pdf_security", "No operation")
+            when (op) {
+                "encrypt" -> PythonBridge.executePdfTool("encrypt_pdf", args)
+                "decrypt" -> PythonBridge.executePdfTool("decrypt_pdf", args)
+                "flatten" -> PythonBridge.executePdfTool("flatten_pdf", args)
+                else -> toolError("pdf_security", "Unknown operation: $op")
+            }
+        }
+
+        registry.register("pdf_forms") { args ->
+            val op = args["operation"] ?: return@register toolError("pdf_forms", "No operation")
+            when (op) {
+                "fill" -> PythonBridge.executePdfTool("fill_form", args)
+                "create" -> PythonBridge.executePdfTool("create_form", args)
+                else -> toolError("pdf_forms", "Unknown operation: $op")
+            }
+        }
+
+        registry.register("pdf_convert") { args ->
+            val op = args["operation"] ?: return@register toolError("pdf_convert", "No operation")
+            when (op) {
+                "to_images" -> PythonBridge.executePdfTool("pdf_to_images", args)
+                "from_images" -> PythonBridge.executePdfTool("images_to_pdf", mapOf(
+                    "input_path" to (args["input_paths"] ?: ""),
+                    "output_path" to (args["output_path"] ?: "")
+                ))
+                "from_html" -> PythonBridge.executePdfTool("html_to_pdf", args)
+                "from_text" -> PythonBridge.executePdfTool("text_to_pdf", args)
+                "overlay" -> PythonBridge.executePdfTool("overlay_pdfs", args)
+                else -> toolError("pdf_convert", "Unknown operation: $op")
+            }
+        }
+
+        registry.register("pdf_info") { args ->
+            PythonBridge.executePdfTool("get_pdf_info", args)
+        }
+
+        // --- Image consolidated tools ---
+        registry.register("image_transform") { args ->
+            val op = args["operation"] ?: return@register toolError("image_transform", "No operation")
+            when (op) {
+                "resize" -> PythonBridge.executeImageTool("resize_image", args)
+                "crop" -> PythonBridge.executeImageTool("crop_image", args)
+                "rotate" -> PythonBridge.executeImageTool("rotate_image", args)
+                "flip" -> PythonBridge.executeImageTool("flip_image", args)
+                else -> toolError("image_transform", "Unknown operation: $op")
+            }
+        }
+
+        registry.register("image_adjust") { args ->
+            val op = args["operation"] ?: return@register toolError("image_adjust", "No operation")
+            when (op) {
+                "brightness" -> PythonBridge.executeImageTool("adjust_brightness", args)
+                "contrast" -> PythonBridge.executeImageTool("adjust_contrast", args)
+                "saturation" -> PythonBridge.executeImageTool("adjust_saturation", args)
+                else -> toolError("image_adjust", "Unknown operation: $op")
+            }
+        }
+
+        registry.register("image_filter") { args ->
+            PythonBridge.executeImageTool("apply_image_filter", args)
+        }
+
+        registry.register("image_overlay") { args ->
+            val op = args["operation"] ?: return@register toolError("image_overlay", "No operation")
+            when (op) {
+                "text" -> PythonBridge.executeImageTool("add_text_overlay", args)
+                "image" -> PythonBridge.executeImageTool("add_image_overlay", args)
+                "watermark" -> PythonBridge.executeImageTool("add_watermark_image", args)
+                "border" -> PythonBridge.executeImageTool("create_border", args)
+                "thumbnail" -> PythonBridge.executeImageTool("generate_thumbnail", args)
+                else -> toolError("image_overlay", "Unknown operation: $op")
+            }
+        }
+
+        registry.register("image_convert") { args ->
+            val op = args["operation"] ?: return@register toolError("image_convert", "No operation")
+            when (op) {
+                "convert_format" -> PythonBridge.executeImageTool("convert_image_format", args)
+                "compress" -> PythonBridge.executeImageTool("compress_image", args)
+                "metadata" -> PythonBridge.executeImageTool("get_image_metadata", args)
+                "strip_metadata" -> PythonBridge.executeImageTool("strip_image_metadata", args)
+                "change_dpi" -> PythonBridge.executeImageTool("change_dpi", args)
+                "create" -> PythonBridge.executeImageTool("create_image", args)
+                else -> toolError("image_convert", "Unknown operation: $op")
+            }
+        }
+
+        registry.register("image_batch") { args ->
+            val op = args["operation"] ?: return@register toolError("image_batch", "No operation")
+            when (op) {
+                "batch_resize" -> PythonBridge.executeImageTool("batch_resize", args)
+                "batch_convert" -> PythonBridge.executeImageTool("batch_convert_format", args)
+                else -> toolError("image_batch", "Unknown operation: $op")
+            }
+        }
+
+        registry.register("image_create_qr") { args ->
+            PythonBridge.executeImageTool("generate_qr_code", args)
+        }
+
+        // --- Text/Document consolidated tools ---
+        registry.register("text_read_write") { args ->
+            val op = args["operation"] ?: return@register toolError("text_read_write", "No operation")
+            when (op) {
+                "read" -> PythonBridge.executeTextTool("read_text_file", args)
+                "create" -> PythonBridge.executeTextTool("create_text_file", args)
+                else -> toolError("text_read_write", "Unknown operation: $op")
+            }
+        }
+
+        registry.register("text_edit") { args ->
+            val op = args["operation"] ?: return@register toolError("text_edit", "No operation")
+            when (op) {
+                "find_replace" -> PythonBridge.executeTextTool("find_replace_text", args)
+                "word_count" -> PythonBridge.executeTextTool("word_count", args)
+                else -> toolError("text_edit", "Unknown operation: $op")
+            }
+        }
+
+        registry.register("docx_operation") { args ->
+            val op = args["operation"] ?: return@register toolError("docx_operation", "No operation")
+            when (op) {
+                "read" -> PythonBridge.executeTextTool("read_docx", args)
+                "create" -> PythonBridge.executeTextTool("create_docx", args)
+                "edit" -> PythonBridge.executeTextTool("edit_docx", args)
+                "merge" -> PythonBridge.executeTextTool("merge_docx", mapOf(
+                    "input_path" to (args["input_paths"] ?: ""),
+                    "output_path" to (args["output_path"] ?: "")
+                ))
+                "to_pdf" -> PythonBridge.executeTextTool("docx_to_pdf", args)
+                "extract_images" -> PythonBridge.executeTextTool("extract_docx_images", args)
+                else -> toolError("docx_operation", "Unknown operation: $op")
+            }
+        }
+
+        registry.register("markdown_to_pdf") { args ->
+            PythonBridge.executeTextTool("markdown_to_pdf", args)
+        }
+
+        // --- Spreadsheet consolidated tool ---
+        registry.register("spreadsheet_operation") { args ->
+            val op = args["operation"] ?: return@register toolError("spreadsheet_operation", "No operation")
+            when (op) {
+                "read" -> PythonBridge.executeSpreadsheetTool("read_spreadsheet", args)
+                "create" -> PythonBridge.executeSpreadsheetTool("create_spreadsheet", args)
+                "edit_cell" -> PythonBridge.executeSpreadsheetTool("edit_cell", args)
+                "sort" -> PythonBridge.executeSpreadsheetTool("sort_spreadsheet", args)
+                "merge" -> PythonBridge.executeSpreadsheetTool("merge_spreadsheets", mapOf(
+                    "input_path" to (args["input_paths"] ?: ""),
+                    "output_path" to (args["output_path"] ?: "")
+                ))
+                "csv_to_xlsx" -> PythonBridge.executeSpreadsheetTool("csv_to_xlsx", args)
+                "to_pdf" -> PythonBridge.executeSpreadsheetTool("spreadsheet_to_pdf", args)
+                else -> toolError("spreadsheet_operation", "Unknown operation: $op")
+            }
+        }
+
+        // --- Presentation consolidated tool ---
+        registry.register("presentation_operation") { args ->
+            val op = args["operation"] ?: return@register toolError("presentation_operation", "No operation")
+            when (op) {
+                "read" -> PythonBridge.executePresentationTool("read_presentation", args)
+                "create" -> PythonBridge.executePresentationTool("create_presentation", args)
+                "to_pdf" -> PythonBridge.executePresentationTool("presentation_to_pdf", args)
+                "info" -> PythonBridge.executePresentationTool("get_presentation_info", args)
+                else -> toolError("presentation_operation", "Unknown operation: $op")
+            }
+        }
+
+        // --- Audio consolidated tool ---
+        registry.register("audio_operation") { args ->
+            val op = args["operation"] ?: return@register toolError("audio_operation", "No operation")
+            when (op) {
+                "info" -> PythonBridge.executeAudioTool("get_audio_info", args)
+                "trim" -> PythonBridge.executeAudioTool("trim_audio", args)
+                "convert" -> PythonBridge.executeAudioTool("convert_audio_format", args)
+                else -> toolError("audio_operation", "Unknown operation: $op")
+            }
+        }
+
+        // --- Video consolidated tool ---
+        registry.register("video_operation") { args ->
+            val op = args["operation"] ?: return@register toolError("video_operation", "No operation")
+            when (op) {
+                "info" -> PythonBridge.executeVideoTool("get_video_info", args)
+                "trim" -> PythonBridge.executeVideoTool("trim_video", args)
+                "extract_audio" -> PythonBridge.executeVideoTool("extract_audio_from_video", args)
+                "to_gif" -> PythonBridge.executeVideoTool("video_to_gif", args)
+                "thumbnail" -> PythonBridge.executeVideoTool("generate_video_thumbnail", args)
+                else -> toolError("video_operation", "Unknown operation: $op")
+            }
+        }
+
+        // --- Archive consolidated tool ---
+        registry.register("archive_operation") { args ->
+            val op = args["operation"] ?: return@register toolError("archive_operation", "No operation")
+            when (op) {
+                "create" -> PythonBridge.executeArchiveTool("create_zip", mapOf(
+                    "input_path" to (args["input_paths"] ?: ""),
+                    "output_path" to (args["output_path"] ?: "")
+                ))
+                "extract" -> PythonBridge.executeArchiveTool("extract_zip", args)
+                "list" -> PythonBridge.executeArchiveTool("list_archive_contents", args)
+                else -> toolError("archive_operation", "Unknown operation: $op")
+            }
+        }
+
+        // --- OCR tool (uses ML Kit) ---
+        val ocrHelper = OcrHelper(this)
+        registry.register("ocr_extract_text") { args ->
+            val path = args["input_path"] ?: return@register toolError("ocr_extract_text", "No input_path")
+            ocrHelper.extractTextFromFile(path)
+        }
+
+        // --- Utility tools ---
+        registry.register("get_file_info") { args ->
+            PythonBridge.executeImageTool("get_file_info", args)
+        }
+
+        registry.register("compare_files") { args ->
+            PythonBridge.executeImageTool("compare_files", args)
         }
 
         registry.register("execute_python") { args ->
-            val code = args["code"] ?: return@register com.docdroid.model.ToolResult(
-                toolName = "execute_python",
-                status = com.docdroid.model.ToolStatus.FAILED,
-                error = "No code provided"
-            )
+            val code = args["code"] ?: return@register toolError("execute_python", "No code provided")
             PythonBridge.executeArbitraryPython(code)
         }
+    }
+
+    private fun toolError(toolName: String, message: String): ToolResult {
+        return ToolResult(
+            toolName = toolName,
+            status = ToolStatus.FAILED,
+            error = message
+        )
     }
 
     companion object {

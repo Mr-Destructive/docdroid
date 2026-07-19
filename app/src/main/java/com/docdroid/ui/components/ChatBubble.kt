@@ -48,6 +48,13 @@ fun ChatBubble(message: ChatMessage, modifier: Modifier = Modifier) {
             )
         }
 
+        if (message.attachments.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(4.dp))
+            message.attachments.forEach { file ->
+                FileAttachment(file = file)
+            }
+        }
+
         if (message.toolCalls.isNotEmpty()) {
             Spacer(modifier = Modifier.height(4.dp))
             message.toolCalls.forEach { tc ->

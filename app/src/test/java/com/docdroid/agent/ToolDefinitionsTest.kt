@@ -39,19 +39,44 @@ class ToolDefinitionsTest {
     }
 
     @Test
-    fun `tool categories have expected tools`() {
+    fun `consolidated tools include expected names`() {
         val defs = getAllToolDefinitions()
         val names = defs.map { it.name }.toSet()
 
-        assertTrue("merge_pdfs should exist", names.contains("merge_pdfs"))
-        assertTrue("resize_image should exist", names.contains("resize_image"))
-        assertTrue("read_text_file should exist", names.contains("read_text_file"))
-        assertTrue("read_spreadsheet should exist", names.contains("read_spreadsheet"))
-        assertTrue("read_presentation should exist", names.contains("read_presentation"))
-        assertTrue("get_audio_info should exist", names.contains("get_audio_info"))
-        assertTrue("get_video_info should exist", names.contains("get_video_info"))
-        assertTrue("create_zip should exist", names.contains("create_zip"))
+        assertTrue("pdf_merge_split should exist", names.contains("pdf_merge_split"))
+        assertTrue("pdf_pages should exist", names.contains("pdf_pages"))
+        assertTrue("pdf_watermark should exist", names.contains("pdf_watermark"))
+        assertTrue("pdf_extract should exist", names.contains("pdf_extract"))
+        assertTrue("pdf_security should exist", names.contains("pdf_security"))
+        assertTrue("pdf_forms should exist", names.contains("pdf_forms"))
+        assertTrue("pdf_convert should exist", names.contains("pdf_convert"))
+        assertTrue("pdf_info should exist", names.contains("pdf_info"))
+        assertTrue("image_transform should exist", names.contains("image_transform"))
+        assertTrue("image_adjust should exist", names.contains("image_adjust"))
+        assertTrue("image_filter should exist", names.contains("image_filter"))
+        assertTrue("image_overlay should exist", names.contains("image_overlay"))
+        assertTrue("image_convert should exist", names.contains("image_convert"))
+        assertTrue("image_batch should exist", names.contains("image_batch"))
+        assertTrue("image_create_qr should exist", names.contains("image_create_qr"))
+        assertTrue("text_read_write should exist", names.contains("text_read_write"))
+        assertTrue("text_edit should exist", names.contains("text_edit"))
+        assertTrue("docx_operation should exist", names.contains("docx_operation"))
+        assertTrue("markdown_to_pdf should exist", names.contains("markdown_to_pdf"))
+        assertTrue("spreadsheet_operation should exist", names.contains("spreadsheet_operation"))
+        assertTrue("presentation_operation should exist", names.contains("presentation_operation"))
+        assertTrue("audio_operation should exist", names.contains("audio_operation"))
+        assertTrue("video_operation should exist", names.contains("video_operation"))
+        assertTrue("archive_operation should exist", names.contains("archive_operation"))
+        assertTrue("ocr_extract_text should exist", names.contains("ocr_extract_text"))
+        assertTrue("get_file_info should exist", names.contains("get_file_info"))
+        assertTrue("compare_files should exist", names.contains("compare_files"))
         assertTrue("execute_python should exist", names.contains("execute_python"))
+    }
+
+    @Test
+    fun `consolidated tool count is manageable for small model`() {
+        val defs = getAllToolDefinitions()
+        assertTrue("Expected ~23-30 consolidated tools, got ${defs.size}", defs.size in 20..35)
     }
 
     @Test
@@ -102,25 +127,11 @@ class ToolDefinitionsTest {
     }
 
     @Test
-    fun `pdfToolDefinitions count matches expected`() {
-        assertTrue("Expected >= 20 PDF tools, got ${pdfToolDefinitions.size}", pdfToolDefinitions.size >= 20)
-    }
-
-    @Test
-    fun `imageToolDefinitions count matches expected`() {
-        assertTrue("Expected >= 20 image tools, got ${imageToolDefinitions.size}", imageToolDefinitions.size >= 20)
-    }
-
-    @Test
-    fun `genericToolDefinitions includes execute_python`() {
-        val names = genericToolDefinitions.map { it.name }
-        assertTrue("execute_python should be in generic tools", names.contains("execute_python"))
-    }
-
-    @Test
-    fun `total tool count matches expected`() {
+    fun `consolidated tools have operation parameter where applicable`() {
         val defs = getAllToolDefinitions()
-        assertTrue("Expected 95+ tools, got ${defs.size}", defs.size >= 90)
+        val toolsWithOperation = defs.filter { it.parameters.containsKey("operation") }
+        assertTrue("Expected multiple tools with 'operation' param, got ${toolsWithOperation.size}",
+            toolsWithOperation.size >= 15)
     }
 
     @Test

@@ -49,231 +49,361 @@ private fun escapeJson(s: String): String =
     """"${s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r")}""""
 
 fun getAllToolDefinitions(): List<ToolDefinition> =
-    pdfToolDefinitions + imageToolDefinitions + textToolDefinitions +
-            spreadsheetToolDefinitions + presentationToolDefinitions +
-            audioToolDefinitions + videoToolDefinitions +
-            archiveToolDefinitions + genericToolDefinitions
+    consolidatedToolDefinitions
 
-// ===== PDF TOOLS =====
-val pdfToolDefinitions = listOf(
-    ToolDefinition("merge_pdfs", "Merge multiple PDFs into one.", mapOf(
-        "input_paths" to ParameterDef("string", "Comma-separated PDF paths"), "output_path" to ParameterDef("string", "Output path"))),
-    ToolDefinition("split_pdf", "Split a PDF by page ranges (e.g. '1-3,5').", mapOf(
-        "input_path" to ParameterDef("string", "Input PDF"), "page_ranges" to ParameterDef("string", "Page ranges"), "output_dir" to ParameterDef("string", "Output dir"))),
-    ToolDefinition("extract_pages", "Extract specific pages from a PDF.", mapOf(
-        "input_path" to ParameterDef("string", "Input PDF"), "pages" to ParameterDef("string", "Page numbers e.g. '1,3,5'"), "output_path" to ParameterDef("string", "Output path"))),
-    ToolDefinition("delete_pages", "Delete pages from a PDF.", mapOf(
-        "input_path" to ParameterDef("string", "Input PDF"), "pages" to ParameterDef("string", "Pages to delete"), "output_path" to ParameterDef("string", "Output path"))),
-    ToolDefinition("reorder_pages", "Reorder pages in a PDF.", mapOf(
-        "input_path" to ParameterDef("string", "Input PDF"), "new_order" to ParameterDef("string", "New order e.g. '3,1,2'"), "output_path" to ParameterDef("string", "Output path"))),
-    ToolDefinition("rotate_pages", "Rotate pages by 90/180/270 degrees.", mapOf(
-        "input_path" to ParameterDef("string", "Input PDF"), "pages" to ParameterDef("string", "Pages or 'all'"), "degrees" to ParameterDef("string", "90, 180, or 270"), "output_path" to ParameterDef("string", "Output path"))),
-    ToolDefinition("crop_pdf", "Crop page margins.", mapOf(
-        "input_path" to ParameterDef("string", "Input PDF"), "left" to ParameterDef("string", "Left margin pt"), "top" to ParameterDef("string", "Top margin pt"), "right" to ParameterDef("string", "Right margin pt"), "bottom" to ParameterDef("string", "Bottom margin pt"), "output_path" to ParameterDef("string", "Output path"))),
-    ToolDefinition("resize_pdf", "Resize PDF to a4/letter/legal.", mapOf(
-        "input_path" to ParameterDef("string", "Input PDF"), "size" to ParameterDef("string", "a4, letter, legal, a3, a5"), "output_path" to ParameterDef("string", "Output path"))),
-    ToolDefinition("add_watermark_text", "Add text watermark to every page.", mapOf(
-        "input_path" to ParameterDef("string", "Input PDF"), "text" to ParameterDef("string", "Watermark text"), "font_size" to ParameterDef("string", "Font size (default 48)"), "opacity" to ParameterDef("string", "0.0-1.0 (default 0.3)"), "rotation" to ParameterDef("string", "Degrees (default -45)"), "output_path" to ParameterDef("string", "Output path"))),
-    ToolDefinition("add_watermark_image", "Add image watermark to every page.", mapOf(
-        "input_path" to ParameterDef("string", "Input PDF"), "image_path" to ParameterDef("string", "Watermark image"), "opacity" to ParameterDef("string", "0.0-1.0"), "output_path" to ParameterDef("string", "Output path"))),
-    ToolDefinition("add_page_numbers", "Add page numbers to PDF.", mapOf(
-        "input_path" to ParameterDef("string", "Input PDF"), "position" to ParameterDef("string", "bottom-center, bottom-right, top-center, top-right"), "font_size" to ParameterDef("string", "Size (default 10)"), "output_path" to ParameterDef("string", "Output path"))),
-    ToolDefinition("add_header_footer", "Add header/footer text.", mapOf(
-        "input_path" to ParameterDef("string", "Input PDF"), "header" to ParameterDef("string", "Header text"), "footer" to ParameterDef("string", "Footer text"), "output_path" to ParameterDef("string", "Output path"))),
-    ToolDefinition("extract_text", "Extract text from PDF.", mapOf(
-        "input_path" to ParameterDef("string", "Input PDF"), "pages" to ParameterDef("string", "Optional pages e.g. '1-5'"))),
-    ToolDefinition("extract_text_with_positions", "Extract text with x,y coordinates.", mapOf(
-        "input_path" to ParameterDef("string", "Input PDF"))),
-    ToolDefinition("extract_images", "Extract embedded images from PDF.", mapOf(
-        "input_path" to ParameterDef("string", "Input PDF"), "output_dir" to ParameterDef("string", "Output dir"))),
-    ToolDefinition("extract_tables", "Extract tables from PDF as CSV.", mapOf(
-        "input_path" to ParameterDef("string", "Input PDF"), "pages" to ParameterDef("string", "Optional pages"))),
-    ToolDefinition("compress_pdf", "Reduce PDF file size.", mapOf(
-        "input_path" to ParameterDef("string", "Input PDF"), "quality" to ParameterDef("string", "1-100 (default 60)"), "output_path" to ParameterDef("string", "Output path"))),
-    ToolDefinition("encrypt_pdf", "Password-protect a PDF.", mapOf(
-        "input_path" to ParameterDef("string", "Input PDF"), "user_password" to ParameterDef("string", "Open password"), "owner_password" to ParameterDef("string", "Owner password"), "output_path" to ParameterDef("string", "Output path"))),
-    ToolDefinition("decrypt_pdf", "Remove PDF password.", mapOf(
-        "input_path" to ParameterDef("string", "Input PDF"), "password" to ParameterDef("string", "Current password"), "output_path" to ParameterDef("string", "Output path"))),
-    ToolDefinition("fill_form", "Fill AcroForm fields.", mapOf(
-        "input_path" to ParameterDef("string", "Input PDF"), "fields" to ParameterDef("string", "JSON {field:value}"), "output_path" to ParameterDef("string", "Output path"))),
-    ToolDefinition("create_form", "Create PDF with fillable fields.", mapOf(
-        "fields" to ParameterDef("string", "JSON array of fields"), "title" to ParameterDef("string", "Title"), "output_path" to ParameterDef("string", "Output path"))),
-    ToolDefinition("add_bookmarks", "Add bookmarks/TOC.", mapOf(
-        "input_path" to ParameterDef("string", "Input PDF"), "bookmarks" to ParameterDef("string", "JSON [{title,page}]"), "output_path" to ParameterDef("string", "Output path"))),
-    ToolDefinition("extract_metadata", "Get PDF metadata.", mapOf(
-        "input_path" to ParameterDef("string", "Input PDF"))),
-    ToolDefinition("set_metadata", "Set PDF metadata.", mapOf(
-        "input_path" to ParameterDef("string", "Input PDF"), "title" to ParameterDef("string", "Title"), "author" to ParameterDef("string", "Author"), "output_path" to ParameterDef("string", "Output path"))),
-    ToolDefinition("pdf_to_images", "Convert PDF pages to images.", mapOf(
-        "input_path" to ParameterDef("string", "Input PDF"), "format" to ParameterDef("string", "png or jpg"), "dpi" to ParameterDef("string", "DPI (default 200)"), "output_dir" to ParameterDef("string", "Output dir"))),
-    ToolDefinition("images_to_pdf", "Combine images into a PDF.", mapOf(
-        "input_paths" to ParameterDef("string", "Comma-separated image paths"), "output_path" to ParameterDef("string", "Output PDF"))),
-    ToolDefinition("html_to_pdf", "Convert HTML to PDF.", mapOf(
-        "input_path" to ParameterDef("string", "Input HTML"), "output_path" to ParameterDef("string", "Output PDF"))),
-    ToolDefinition("text_to_pdf", "Convert text to formatted PDF.", mapOf(
-        "input_path" to ParameterDef("string", "Input text"), "output_path" to ParameterDef("string", "Output PDF"), "font_size" to ParameterDef("string", "Default 12"))),
-    ToolDefinition("overlay_pdfs", "Overlay one PDF on another.", mapOf(
-        "base_path" to ParameterDef("string", "Base PDF"), "overlay_path" to ParameterDef("string", "Overlay PDF"), "output_path" to ParameterDef("string", "Output path"))),
-    ToolDefinition("flatten_pdf", "Flatten form fields into page content.", mapOf(
-        "input_path" to ParameterDef("string", "Input PDF"), "output_path" to ParameterDef("string", "Output path"))),
-    ToolDefinition("get_pdf_info", "Get PDF summary (pages, size, permissions).", mapOf(
-        "input_path" to ParameterDef("string", "Input PDF")))
-)
+// ===== CONSOLIDATED TOOLS (23 total for 26M param model) =====
+val consolidatedToolDefinitions = listOf(
+    // --- PDF Operations ---
+    ToolDefinition(
+        name = "pdf_merge_split",
+        description = "Merge multiple PDFs into one, or split a PDF by page ranges.",
+        mapOf(
+            "operation" to ParameterDef("string", "merge or split", enum = listOf("merge", "split")),
+            "input_paths" to ParameterDef("string", "Comma-separated PDF paths (for merge)", required = false),
+            "input_path" to ParameterDef("string", "Input PDF path (for split)", required = false),
+            "page_ranges" to ParameterDef("string", "Page ranges e.g. '1-3,5' (for split)", required = false),
+            "output_path" to ParameterDef("string", "Output file path")
+        )
+    ),
+    ToolDefinition(
+        name = "pdf_pages",
+        description = "Extract, delete, reorder, or rotate pages in a PDF.",
+        mapOf(
+            "operation" to ParameterDef("string", "extract, delete, reorder, or rotate", enum = listOf("extract", "delete", "reorder", "rotate")),
+            "input_path" to ParameterDef("string", "Input PDF path"),
+            "pages" to ParameterDef("string", "Pages e.g. '1,3,5' or 'all' (required for extract/delete/rotate)", required = false),
+            "new_order" to ParameterDef("string", "New page order e.g. '3,1,2' (for reorder)", required = false),
+            "degrees" to ParameterDef("string", "Rotation degrees: 90, 180, or 270 (for rotate)", required = false),
+            "output_path" to ParameterDef("string", "Output PDF path")
+        )
+    ),
+    ToolDefinition(
+        name = "pdf_crop_resize",
+        description = "Crop margins or resize PDF to standard page sizes (a4, letter, legal).",
+        mapOf(
+            "operation" to ParameterDef("string", "crop or resize", enum = listOf("crop", "resize")),
+            "input_path" to ParameterDef("string", "Input PDF path"),
+            "left" to ParameterDef("string", "Left margin in pt (for crop)", required = false),
+            "top" to ParameterDef("string", "Top margin in pt (for crop)", required = false),
+            "right" to ParameterDef("string", "Right margin in pt (for crop)", required = false),
+            "bottom" to ParameterDef("string", "Bottom margin in pt (for crop)", required = false),
+            "size" to ParameterDef("string", "Target size: a4, letter, legal, a3, a5 (for resize)", required = false),
+            "output_path" to ParameterDef("string", "Output PDF path")
+        )
+    ),
+    ToolDefinition(
+        name = "pdf_watermark",
+        description = "Add text or image watermark, page numbers, or header/footer to a PDF.",
+        mapOf(
+            "operation" to ParameterDef("string", "text_watermark, image_watermark, page_numbers, header_footer", enum = listOf("text_watermark", "image_watermark", "page_numbers", "header_footer")),
+            "input_path" to ParameterDef("string", "Input PDF path"),
+            "text" to ParameterDef("string", "Watermark/header/footer text", required = false),
+            "image_path" to ParameterDef("string", "Watermark image path (for image_watermark)", required = false),
+            "font_size" to ParameterDef("string", "Font size (default 48)", required = false),
+            "opacity" to ParameterDef("string", "0.0-1.0 (default 0.3)", required = false),
+            "rotation" to ParameterDef("string", "Degrees (default -45)", required = false),
+            "position" to ParameterDef("string", "bottom-center, bottom-right, top-center, top-right (for page_numbers)", required = false),
+            "header" to ParameterDef("string", "Header text (for header_footer)", required = false),
+            "footer" to ParameterDef("string", "Footer text (for header_footer)", required = false),
+            "output_path" to ParameterDef("string", "Output PDF path")
+        )
+    ),
+    ToolDefinition(
+        name = "pdf_extract",
+        description = "Extract text, images, tables, or metadata from a PDF.",
+        mapOf(
+            "operation" to ParameterDef("string", "text, images, tables, metadata", enum = listOf("text", "images", "tables", "metadata")),
+            "input_path" to ParameterDef("string", "Input PDF path"),
+            "pages" to ParameterDef("string", "Optional page range e.g. '1-5'", required = false),
+            "output_dir" to ParameterDef("string", "Output directory (for images)", required = false)
+        )
+    ),
+    ToolDefinition(
+        name = "pdf_security",
+        description = "Encrypt (password-protect), decrypt, or flatten a PDF.",
+        mapOf(
+            "operation" to ParameterDef("string", "encrypt, decrypt, flatten", enum = listOf("encrypt", "decrypt", "flatten")),
+            "input_path" to ParameterDef("string", "Input PDF path"),
+            "password" to ParameterDef("string", "Password (for encrypt/decrypt)", required = false),
+            "user_password" to ParameterDef("string", "Open password (for encrypt)", required = false),
+            "owner_password" to ParameterDef("string", "Owner password (for encrypt)", required = false),
+            "output_path" to ParameterDef("string", "Output PDF path")
+        )
+    ),
+    ToolDefinition(
+        name = "pdf_forms",
+        description = "Fill AcroForm fields or create fillable PDF forms.",
+        mapOf(
+            "operation" to ParameterDef("string", "fill, create", enum = listOf("fill", "create")),
+            "input_path" to ParameterDef("string", "Input PDF path (for fill)", required = false),
+            "fields" to ParameterDef("string", "JSON {field:value} for fill, or JSON array of fields for create"),
+            "title" to ParameterDef("string", "Title (for create)", required = false),
+            "output_path" to ParameterDef("string", "Output PDF path")
+        )
+    ),
+    ToolDefinition(
+        name = "pdf_convert",
+        description = "Convert PDF to images, images to PDF, HTML to PDF, or text to PDF.",
+        mapOf(
+            "operation" to ParameterDef("string", "to_images, from_images, from_html, from_text, overlay", enum = listOf("to_images", "from_images", "from_html", "from_text", "overlay")),
+            "input_path" to ParameterDef("string", "Input file path (for to_images/from_html/from_text)", required = false),
+            "input_paths" to ParameterDef("string", "Comma-separated image paths (for from_images)", required = false),
+            "base_path" to ParameterDef("string", "Base PDF (for overlay)", required = false),
+            "overlay_path" to ParameterDef("string", "Overlay PDF (for overlay)", required = false),
+            "format" to ParameterDef("string", "Output format: png or jpg (for to_images)", required = false),
+            "dpi" to ParameterDef("string", "DPI (default 200, for to_images)", required = false),
+            "font_size" to ParameterDef("string", "Font size (default 12, for from_text)", required = false),
+            "output_path" to ParameterDef("string", "Output file path")
+        )
+    ),
+    ToolDefinition(
+        name = "pdf_info",
+        description = "Get PDF summary: page count, file size, permissions, metadata.",
+        mapOf(
+            "input_path" to ParameterDef("string", "Input PDF path")
+        )
+    ),
 
-// ===== IMAGE TOOLS =====
-val imageToolDefinitions = listOf(
-    ToolDefinition("resize_image", "Resize an image.", mapOf(
-        "input_path" to ParameterDef("string", "Input image"), "width" to ParameterDef("string", "Width px (0=proportional)"), "height" to ParameterDef("string", "Height px"), "output_path" to ParameterDef("string", "Output path"))),
-    ToolDefinition("crop_image", "Crop an image to a region.", mapOf(
-        "input_path" to ParameterDef("string", "Input"), "x" to ParameterDef("string", "Left"), "y" to ParameterDef("string", "Top"), "width" to ParameterDef("string", "Width"), "height" to ParameterDef("string", "Height"), "output_path" to ParameterDef("string", "Output"))),
-    ToolDefinition("rotate_image", "Rotate image by degrees.", mapOf(
-        "input_path" to ParameterDef("string", "Input"), "degrees" to ParameterDef("string", "Degrees"), "output_path" to ParameterDef("string", "Output"))),
-    ToolDefinition("flip_image", "Flip horizontally or vertically.", mapOf(
-        "input_path" to ParameterDef("string", "Input"), "direction" to ParameterDef("string", "horizontal or vertical"), "output_path" to ParameterDef("string", "Output"))),
-    ToolDefinition("convert_image_format", "Convert between PNG/JPG/WebP/BMP/TIFF/GIF.", mapOf(
-        "input_path" to ParameterDef("string", "Input"), "format" to ParameterDef("string", "Target format"), "output_path" to ParameterDef("string", "Output"))),
-    ToolDefinition("compress_image", "Compress image by quality.", mapOf(
-        "input_path" to ParameterDef("string", "Input"), "quality" to ParameterDef("string", "1-100 (default 60)"), "output_path" to ParameterDef("string", "Output"))),
-    ToolDefinition("get_image_metadata", "Get image dimensions, format, EXIF.", mapOf(
-        "input_path" to ParameterDef("string", "Input"))),
-    ToolDefinition("strip_image_metadata", "Remove all metadata from image.", mapOf(
-        "input_path" to ParameterDef("string", "Input"), "output_path" to ParameterDef("string", "Output"))),
-    ToolDefinition("adjust_brightness", "Adjust brightness.", mapOf(
-        "input_path" to ParameterDef("string", "Input"), "factor" to ParameterDef("string", "1.0=no change"), "output_path" to ParameterDef("string", "Output"))),
-    ToolDefinition("adjust_contrast", "Adjust contrast.", mapOf(
-        "input_path" to ParameterDef("string", "Input"), "factor" to ParameterDef("string", "1.0=no change"), "output_path" to ParameterDef("string", "Output"))),
-    ToolDefinition("adjust_saturation", "Adjust color saturation.", mapOf(
-        "input_path" to ParameterDef("string", "Input"), "factor" to ParameterDef("string", "1.0=no change"), "output_path" to ParameterDef("string", "Output"))),
-    ToolDefinition("apply_image_filter", "Apply filter: grayscale, sepia, invert, blur, sharpen, emboss, edge_detect, smooth.", mapOf(
-        "input_path" to ParameterDef("string", "Input"), "filter" to ParameterDef("string", "Filter name"), "output_path" to ParameterDef("string", "Output"))),
-    ToolDefinition("add_text_overlay", "Draw text on image.", mapOf(
-        "input_path" to ParameterDef("string", "Input"), "text" to ParameterDef("string", "Text"), "x" to ParameterDef("string", "X"), "y" to ParameterDef("string", "Y"), "font_size" to ParameterDef("string", "Default 24"), "color" to ParameterDef("string", "Hex color"), "output_path" to ParameterDef("string", "Output"))),
-    ToolDefinition("add_image_overlay", "Overlay one image on another.", mapOf(
-        "base_path" to ParameterDef("string", "Base"), "overlay_path" to ParameterDef("string", "Overlay"), "x" to ParameterDef("string", "X pos"), "y" to ParameterDef("string", "Y pos"), "opacity" to ParameterDef("string", "0.0-1.0"), "output_path" to ParameterDef("string", "Output"))),
-    ToolDefinition("add_watermark_image", "Add watermark to image.", mapOf(
-        "input_path" to ParameterDef("string", "Input"), "watermark_text" to ParameterDef("string", "Text"), "opacity" to ParameterDef("string", "0.0-1.0"), "position" to ParameterDef("string", "center, top-left, etc"), "output_path" to ParameterDef("string", "Output"))),
-    ToolDefinition("generate_thumbnail", "Generate thumbnail.", mapOf(
-        "input_path" to ParameterDef("string", "Input"), "max_size" to ParameterDef("string", "Max px (default 200)"), "output_path" to ParameterDef("string", "Output"))),
-    ToolDefinition("auto_enhance", "Auto-enhance image.", mapOf(
-        "input_path" to ParameterDef("string", "Input"), "output_path" to ParameterDef("string", "Output"))),
-    ToolDefinition("create_border", "Add border/frame.", mapOf(
-        "input_path" to ParameterDef("string", "Input"), "border_size" to ParameterDef("string", "Width px"), "color" to ParameterDef("string", "Hex color"), "output_path" to ParameterDef("string", "Output"))),
-    ToolDefinition("change_dpi", "Change DPI metadata.", mapOf(
-        "input_path" to ParameterDef("string", "Input"), "dpi" to ParameterDef("string", "Target DPI"), "output_path" to ParameterDef("string", "Output"))),
-    ToolDefinition("create_image", "Create blank image.", mapOf(
-        "width" to ParameterDef("string", "Width"), "height" to ParameterDef("string", "Height"), "color" to ParameterDef("string", "Hex color"), "output_path" to ParameterDef("string", "Output"))),
-    ToolDefinition("create_collage", "Create grid collage.", mapOf(
-        "input_paths" to ParameterDef("string", "Comma-separated paths"), "columns" to ParameterDef("string", "Columns"), "spacing" to ParameterDef("string", "Px"), "output_path" to ParameterDef("string", "Output"))),
-    ToolDefinition("draw_shapes", "Draw shapes on image.", mapOf(
-        "input_path" to ParameterDef("string", "Input"), "shapes" to ParameterDef("string", "JSON shapes array"), "output_path" to ParameterDef("string", "Output"))),
-    ToolDefinition("batch_resize", "Resize multiple images.", mapOf(
-        "input_paths" to ParameterDef("string", "Comma-separated paths"), "width" to ParameterDef("string", "Width"), "height" to ParameterDef("string", "Height"), "output_dir" to ParameterDef("string", "Output dir"))),
-    ToolDefinition("batch_convert_format", "Convert multiple images.", mapOf(
-        "input_paths" to ParameterDef("string", "Comma-separated paths"), "format" to ParameterDef("string", "Target format"), "output_dir" to ParameterDef("string", "Output dir"))),
-    ToolDefinition("generate_qr_code", "Create QR code from text.", mapOf(
-        "content" to ParameterDef("string", "Text/URL"), "size" to ParameterDef("string", "Px (default 300)"), "output_path" to ParameterDef("string", "Output")))
-)
+    // --- Image Operations ---
+    ToolDefinition(
+        name = "image_transform",
+        description = "Resize, crop, rotate, or flip an image.",
+        mapOf(
+            "operation" to ParameterDef("string", "resize, crop, rotate, flip", enum = listOf("resize", "crop", "rotate", "flip")),
+            "input_path" to ParameterDef("string", "Input image path"),
+            "width" to ParameterDef("string", "Width in px (for resize/crop)", required = false),
+            "height" to ParameterDef("string", "Height in px (for resize/crop)", required = false),
+            "x" to ParameterDef("string", "Left offset (for crop)", required = false),
+            "y" to ParameterDef("string", "Top offset (for crop)", required = false),
+            "degrees" to ParameterDef("string", "Degrees (for rotate)", required = false),
+            "direction" to ParameterDef("string", "horizontal or vertical (for flip)", required = false),
+            "output_path" to ParameterDef("string", "Output image path")
+        )
+    ),
+    ToolDefinition(
+        name = "image_adjust",
+        description = "Adjust brightness, contrast, or saturation of an image.",
+        mapOf(
+            "operation" to ParameterDef("string", "brightness, contrast, saturation", enum = listOf("brightness", "contrast", "saturation")),
+            "input_path" to ParameterDef("string", "Input image path"),
+            "factor" to ParameterDef("string", "Adjustment factor (1.0 = no change)"),
+            "output_path" to ParameterDef("string", "Output image path")
+        )
+    ),
+    ToolDefinition(
+        name = "image_filter",
+        description = "Apply a filter: grayscale, sepia, invert, blur, sharpen, emboss, edge_detect.",
+        mapOf(
+            "filter" to ParameterDef("string", "Filter name", enum = listOf("grayscale", "sepia", "invert", "blur", "sharpen", "emboss", "edge_detect")),
+            "input_path" to ParameterDef("string", "Input image path"),
+            "output_path" to ParameterDef("string", "Output image path")
+        )
+    ),
+    ToolDefinition(
+        name = "image_overlay",
+        description = "Add text overlay, image overlay, watermark, border, or thumbnail.",
+        mapOf(
+            "operation" to ParameterDef("string", "text, image, watermark, border, thumbnail", enum = listOf("text", "image", "watermark", "border", "thumbnail")),
+            "input_path" to ParameterDef("string", "Input image path"),
+            "overlay_path" to ParameterDef("string", "Overlay image path (for image)", required = false),
+            "text" to ParameterDef("string", "Text to draw (for text/watermark)", required = false),
+            "x" to ParameterDef("string", "X position (for text/image)", required = false),
+            "y" to ParameterDef("string", "Y position (for text/image)", required = false),
+            "font_size" to ParameterDef("string", "Font size (default 24)", required = false),
+            "color" to ParameterDef("string", "Hex color (for text/border)", required = false),
+            "opacity" to ParameterDef("string", "0.0-1.0 (for image/watermark)", required = false),
+            "position" to ParameterDef("string", "center, top-left, etc (for watermark)", required = false),
+            "border_size" to ParameterDef("string", "Border width in px (for border)", required = false),
+            "max_size" to ParameterDef("string", "Max px (default 200, for thumbnail)", required = false),
+            "output_path" to ParameterDef("string", "Output image path")
+        )
+    ),
+    ToolDefinition(
+        name = "image_convert",
+        description = "Convert image format, compress, get metadata, strip metadata, change DPI, or create blank image.",
+        mapOf(
+            "operation" to ParameterDef("string", "convert_format, compress, metadata, strip_metadata, change_dpi, create", enum = listOf("convert_format", "compress", "metadata", "strip_metadata", "change_dpi", "create")),
+            "input_path" to ParameterDef("string", "Input image path (not needed for create)", required = false),
+            "format" to ParameterDef("string", "Target format (for convert_format)", required = false),
+            "quality" to ParameterDef("string", "1-100 (default 60, for compress)", required = false),
+            "dpi" to ParameterDef("string", "Target DPI (for change_dpi)", required = false),
+            "width" to ParameterDef("string", "Width (for create)", required = false),
+            "height" to ParameterDef("string", "Height (for create)", required = false),
+            "color" to ParameterDef("string", "Hex color (for create)", required = false),
+            "output_path" to ParameterDef("string", "Output image path (required except for metadata)")
+        )
+    ),
+    ToolDefinition(
+        name = "image_batch",
+        description = "Batch resize or batch convert format for multiple images.",
+        mapOf(
+            "operation" to ParameterDef("string", "batch_resize, batch_convert", enum = listOf("batch_resize", "batch_convert")),
+            "input_paths" to ParameterDef("string", "Comma-separated image paths"),
+            "width" to ParameterDef("string", "Width (for batch_resize)", required = false),
+            "height" to ParameterDef("string", "Height (for batch_resize)", required = false),
+            "format" to ParameterDef("string", "Target format (for batch_convert)", required = false),
+            "output_dir" to ParameterDef("string", "Output directory")
+        )
+    ),
+    ToolDefinition(
+        name = "image_create_qr",
+        description = "Generate a QR code from text or URL.",
+        mapOf(
+            "content" to ParameterDef("string", "Text or URL to encode"),
+            "size" to ParameterDef("string", "Size in px (default 300)"),
+            "output_path" to ParameterDef("string", "Output image path")
+        )
+    ),
 
-// ===== TEXT TOOLS =====
-val textToolDefinitions = listOf(
-    ToolDefinition("read_text_file", "Read text file contents.", mapOf(
-        "input_path" to ParameterDef("string", "File path"))),
-    ToolDefinition("create_text_file", "Create a text file.", mapOf(
-        "content" to ParameterDef("string", "Text content"), "output_path" to ParameterDef("string", "Output path"))),
-    ToolDefinition("find_replace_text", "Find and replace text.", mapOf(
-        "input_path" to ParameterDef("string", "Input"), "find" to ParameterDef("string", "Find text"), "replace" to ParameterDef("string", "Replace with"), "output_path" to ParameterDef("string", "Output"))),
-    ToolDefinition("word_count", "Count words/chars/lines.", mapOf(
-        "input_path" to ParameterDef("string", "Input"))),
-    ToolDefinition("read_docx", "Extract text from Word document.", mapOf(
-        "input_path" to ParameterDef("string", "DOCX path"))),
-    ToolDefinition("create_docx", "Create Word document.", mapOf(
-        "content" to ParameterDef("string", "JSON with title, paragraphs"), "output_path" to ParameterDef("string", "Output DOCX"))),
-    ToolDefinition("edit_docx", "Edit Word document.", mapOf(
-        "input_path" to ParameterDef("string", "Input DOCX"), "edits" to ParameterDef("string", "JSON edits array"), "output_path" to ParameterDef("string", "Output"))),
-    ToolDefinition("docx_to_pdf", "Convert DOCX to PDF.", mapOf(
-        "input_path" to ParameterDef("string", "Input DOCX"), "output_path" to ParameterDef("string", "Output PDF"))),
-    ToolDefinition("markdown_to_pdf", "Convert Markdown to PDF.", mapOf(
-        "input_path" to ParameterDef("string", "Input MD"), "output_path" to ParameterDef("string", "Output PDF"))),
-    ToolDefinition("html_to_text", "Strip HTML tags.", mapOf(
-        "input_path" to ParameterDef("string", "Input HTML"))),
-    ToolDefinition("extract_docx_images", "Extract images from DOCX.", mapOf(
-        "input_path" to ParameterDef("string", "Input DOCX"), "output_dir" to ParameterDef("string", "Output dir"))),
-    ToolDefinition("merge_docx", "Merge Word documents.", mapOf(
-        "input_paths" to ParameterDef("string", "Comma-separated DOCX paths"), "output_path" to ParameterDef("string", "Output")))
-)
+    // --- Text/Document Operations ---
+    ToolDefinition(
+        name = "text_read_write",
+        description = "Read or create a plain text file.",
+        mapOf(
+            "operation" to ParameterDef("string", "read, create", enum = listOf("read", "create")),
+            "input_path" to ParameterDef("string", "File path (for read)", required = false),
+            "content" to ParameterDef("string", "Text content (for create)", required = false),
+            "output_path" to ParameterDef("string", "Output path (for create)", required = false)
+        )
+    ),
+    ToolDefinition(
+        name = "text_edit",
+        description = "Find and replace text in a file, or count words/characters/lines.",
+        mapOf(
+            "operation" to ParameterDef("string", "find_replace, word_count", enum = listOf("find_replace", "word_count")),
+            "input_path" to ParameterDef("string", "Input file path"),
+            "find" to ParameterDef("string", "Text to find (for find_replace)", required = false),
+            "replace" to ParameterDef("string", "Replacement text (for find_replace)", required = false),
+            "output_path" to ParameterDef("string", "Output path (for find_replace)", required = false)
+        )
+    ),
+    ToolDefinition(
+        name = "docx_operation",
+        description = "Read, create, edit, merge Word documents, or convert DOCX to PDF.",
+        mapOf(
+            "operation" to ParameterDef("string", "read, create, edit, merge, to_pdf, extract_images", enum = listOf("read", "create", "edit", "merge", "to_pdf", "extract_images")),
+            "input_path" to ParameterDef("string", "Input DOCX path (not needed for create)", required = false),
+            "input_paths" to ParameterDef("string", "Comma-separated DOCX paths (for merge)", required = false),
+            "content" to ParameterDef("string", "JSON content (for create/edit)", required = false),
+            "edits" to ParameterDef("string", "JSON edits array (for edit)", required = false),
+            "output_path" to ParameterDef("string", "Output file path"),
+            "output_dir" to ParameterDef("string", "Output directory (for extract_images)", required = false)
+        )
+    ),
+    ToolDefinition(
+        name = "markdown_to_pdf",
+        description = "Convert a Markdown file to PDF.",
+        mapOf(
+            "input_path" to ParameterDef("string", "Input Markdown file path"),
+            "output_path" to ParameterDef("string", "Output PDF path")
+        )
+    ),
 
-// ===== SPREADSHEET TOOLS =====
-val spreadsheetToolDefinitions = listOf(
-    ToolDefinition("read_spreadsheet", "Read XLSX/XLS/CSV data.", mapOf(
-        "input_path" to ParameterDef("string", "Input"), "sheet" to ParameterDef("string", "Sheet name"))),
-    ToolDefinition("create_spreadsheet", "Create spreadsheet from data.", mapOf(
-        "data" to ParameterDef("string", "JSON sheets data"), "output_path" to ParameterDef("string", "Output XLSX"))),
-    ToolDefinition("edit_cell", "Edit a cell.", mapOf(
-        "input_path" to ParameterDef("string", "Input"), "sheet" to ParameterDef("string", "Sheet"), "cell" to ParameterDef("string", "Cell e.g. A1"), "value" to ParameterDef("string", "Value"), "output_path" to ParameterDef("string", "Output"))),
-    ToolDefinition("csv_to_xlsx", "Convert CSV to Excel.", mapOf(
-        "input_path" to ParameterDef("string", "CSV"), "output_path" to ParameterDef("string", "XLSX"))),
-    ToolDefinition("spreadsheet_to_pdf", "Convert spreadsheet to PDF.", mapOf(
-        "input_path" to ParameterDef("string", "Input"), "output_path" to ParameterDef("string", "Output PDF"))),
-    ToolDefinition("merge_spreadsheets", "Merge spreadsheets.", mapOf(
-        "input_paths" to ParameterDef("string", "Comma-separated paths"), "output_path" to ParameterDef("string", "Output"))),
-    ToolDefinition("sort_spreadsheet", "Sort by column.", mapOf(
-        "input_path" to ParameterDef("string", "Input"), "sheet" to ParameterDef("string", "Sheet"), "column" to ParameterDef("string", "Column letter"), "ascending" to ParameterDef("string", "true/false"), "output_path" to ParameterDef("string", "Output")))
-)
+    // --- Spreadsheet Operations ---
+    ToolDefinition(
+        name = "spreadsheet_operation",
+        description = "Read, create, edit cells, sort, merge, or convert spreadsheets.",
+        mapOf(
+            "operation" to ParameterDef("string", "read, create, edit_cell, sort, merge, csv_to_xlsx, to_pdf", enum = listOf("read", "create", "edit_cell", "sort", "merge", "csv_to_xlsx", "to_pdf")),
+            "input_path" to ParameterDef("string", "Input spreadsheet path (not needed for create)", required = false),
+            "input_paths" to ParameterDef("string", "Comma-separated paths (for merge)", required = false),
+            "sheet" to ParameterDef("string", "Sheet name", required = false),
+            "cell" to ParameterDef("string", "Cell e.g. A1 (for edit_cell)", required = false),
+            "value" to ParameterDef("string", "Value (for edit_cell)", required = false),
+            "column" to ParameterDef("string", "Column letter (for sort)", required = false),
+            "ascending" to ParameterDef("string", "true/false (for sort)", required = false),
+            "data" to ParameterDef("string", "JSON sheets data (for create)", required = false),
+            "output_path" to ParameterDef("string", "Output file path")
+        )
+    ),
 
-// ===== PRESENTATION TOOLS =====
-val presentationToolDefinitions = listOf(
-    ToolDefinition("read_presentation", "Extract text from PowerPoint.", mapOf(
-        "input_path" to ParameterDef("string", "Input PPTX"))),
-    ToolDefinition("create_presentation", "Create PowerPoint.", mapOf(
-        "slides" to ParameterDef("string", "JSON slides array"), "output_path" to ParameterDef("string", "Output PPTX"))),
-    ToolDefinition("presentation_to_pdf", "Convert PPTX to PDF.", mapOf(
-        "input_path" to ParameterDef("string", "Input"), "output_path" to ParameterDef("string", "Output PDF"))),
-    ToolDefinition("get_presentation_info", "Get slide count and metadata.", mapOf(
-        "input_path" to ParameterDef("string", "Input PPTX")))
-)
+    // --- Presentation Operations ---
+    ToolDefinition(
+        name = "presentation_operation",
+        description = "Read, create presentations, or convert PPTX to PDF.",
+        mapOf(
+            "operation" to ParameterDef("string", "read, create, to_pdf, info", enum = listOf("read", "create", "to_pdf", "info")),
+            "input_path" to ParameterDef("string", "Input PPTX path (for read/to_pdf/info)", required = false),
+            "slides" to ParameterDef("string", "JSON slides array (for create)", required = false),
+            "output_path" to ParameterDef("string", "Output file path")
+        )
+    ),
 
-// ===== AUDIO TOOLS =====
-val audioToolDefinitions = listOf(
-    ToolDefinition("get_audio_info", "Get audio metadata.", mapOf(
-        "input_path" to ParameterDef("string", "Input audio"))),
-    ToolDefinition("trim_audio", "Trim audio by timestamps.", mapOf(
-        "input_path" to ParameterDef("string", "Input"), "start" to ParameterDef("string", "Start time"), "end" to ParameterDef("string", "End time"), "output_path" to ParameterDef("string", "Output"))),
-    ToolDefinition("convert_audio_format", "Convert audio format.", mapOf(
-        "input_path" to ParameterDef("string", "Input"), "format" to ParameterDef("string", "mp3, aac, wav, flac, ogg"), "output_path" to ParameterDef("string", "Output")))
-)
+    // --- Audio Operations ---
+    ToolDefinition(
+        name = "audio_operation",
+        description = "Get audio info, trim audio, or convert audio format.",
+        mapOf(
+            "operation" to ParameterDef("string", "info, trim, convert", enum = listOf("info", "trim", "convert")),
+            "input_path" to ParameterDef("string", "Input audio path"),
+            "start" to ParameterDef("string", "Start time (for trim)", required = false),
+            "end" to ParameterDef("string", "End time (for trim)", required = false),
+            "format" to ParameterDef("string", "Target format: mp3, aac, wav, flac, ogg (for convert)", required = false),
+            "output_path" to ParameterDef("string", "Output path (required for trim/convert)", required = false)
+        )
+    ),
 
-// ===== VIDEO TOOLS =====
-val videoToolDefinitions = listOf(
-    ToolDefinition("get_video_info", "Get video metadata.", mapOf(
-        "input_path" to ParameterDef("string", "Input video"))),
-    ToolDefinition("trim_video", "Trim video by timestamps.", mapOf(
-        "input_path" to ParameterDef("string", "Input"), "start" to ParameterDef("string", "Start"), "end" to ParameterDef("string", "End"), "output_path" to ParameterDef("string", "Output"))),
-    ToolDefinition("extract_audio_from_video", "Extract audio track.", mapOf(
-        "input_path" to ParameterDef("string", "Input video"), "format" to ParameterDef("string", "mp3, aac, wav"), "output_path" to ParameterDef("string", "Output audio"))),
-    ToolDefinition("video_to_gif", "Convert video to GIF.", mapOf(
-        "input_path" to ParameterDef("string", "Input"), "start" to ParameterDef("string", "Start sec"), "duration" to ParameterDef("string", "Duration sec"), "output_path" to ParameterDef("string", "Output GIF"))),
-    ToolDefinition("generate_video_thumbnail", "Extract frame as image.", mapOf(
-        "input_path" to ParameterDef("string", "Input video"), "time" to ParameterDef("string", "Timestamp"), "output_path" to ParameterDef("string", "Output image")))
-)
+    // --- Video Operations ---
+    ToolDefinition(
+        name = "video_operation",
+        description = "Get video info, trim video, extract audio from video, convert to GIF, or extract thumbnail.",
+        mapOf(
+            "operation" to ParameterDef("string", "info, trim, extract_audio, to_gif, thumbnail", enum = listOf("info", "trim", "extract_audio", "to_gif", "thumbnail")),
+            "input_path" to ParameterDef("string", "Input video path"),
+            "start" to ParameterDef("string", "Start time (for trim)", required = false),
+            "end" to ParameterDef("string", "End time (for trim)", required = false),
+            "duration" to ParameterDef("string", "Duration in sec (for to_gif)", required = false),
+            "time" to ParameterDef("string", "Timestamp (for thumbnail)", required = false),
+            "format" to ParameterDef("string", "Audio format: mp3, aac, wav (for extract_audio)", required = false),
+            "output_path" to ParameterDef("string", "Output file path")
+        )
+    ),
 
-// ===== ARCHIVE TOOLS =====
-val archiveToolDefinitions = listOf(
-    ToolDefinition("create_zip", "Create ZIP from files.", mapOf(
-        "input_paths" to ParameterDef("string", "Comma-separated paths"), "output_path" to ParameterDef("string", "Output ZIP"))),
-    ToolDefinition("extract_zip", "Extract ZIP archive.", mapOf(
-        "input_path" to ParameterDef("string", "Input ZIP"), "output_dir" to ParameterDef("string", "Output dir"))),
-    ToolDefinition("list_archive_contents", "List archive contents.", mapOf(
-        "input_path" to ParameterDef("string", "Input archive")))
-)
+    // --- Archive Operations ---
+    ToolDefinition(
+        name = "archive_operation",
+        description = "Create ZIP, extract ZIP, or list archive contents.",
+        mapOf(
+            "operation" to ParameterDef("string", "create, extract, list", enum = listOf("create", "extract", "list")),
+            "input_path" to ParameterDef("string", "Archive path (for extract/list)", required = false),
+            "input_paths" to ParameterDef("string", "Comma-separated file paths (for create)", required = false),
+            "output_path" to ParameterDef("string", "Output ZIP path (for create)", required = false),
+            "output_dir" to ParameterDef("string", "Output directory (for extract)", required = false)
+        )
+    ),
 
-// ===== GENERIC TOOLS =====
-val genericToolDefinitions = listOf(
-    ToolDefinition("get_file_info", "Get file type, size, MIME.", mapOf(
-        "input_path" to ParameterDef("string", "File path"))),
-    ToolDefinition("compare_files", "Compare two files.", mapOf(
-        "path1" to ParameterDef("string", "File 1"), "path2" to ParameterDef("string", "File 2"))),
-    ToolDefinition("execute_python", "Run arbitrary Python code with access to Pillow, pypdf, reportlab, docx, openpyxl, pptx.", mapOf(
-        "code" to ParameterDef("string", "Python code"), "input_files" to ParameterDef("string", "Available file paths"), "output_path" to ParameterDef("string", "Output path"))),
-    ToolDefinition("batch_rename", "Rename files by pattern.", mapOf(
-        "input_paths" to ParameterDef("string", "Comma-separated paths"), "pattern" to ParameterDef("string", "Pattern: {n}=number, {o}=original, {ext}=ext"), "output_dir" to ParameterDef("string", "Output dir")))
+    // --- OCR Operations ---
+    ToolDefinition(
+        name = "ocr_extract_text",
+        description = "Extract text from an image or PDF using optical character recognition (OCR).",
+        mapOf(
+            "input_path" to ParameterDef("string", "Input image or PDF path")
+        )
+    ),
+
+    // --- Utility Operations ---
+    ToolDefinition(
+        name = "get_file_info",
+        description = "Get file type, size, and MIME type for any file.",
+        mapOf(
+            "input_path" to ParameterDef("string", "File path")
+        )
+    ),
+    ToolDefinition(
+        name = "compare_files",
+        description = "Compare two files and report differences.",
+        mapOf(
+            "path1" to ParameterDef("string", "First file path"),
+            "path2" to ParameterDef("string", "Second file path")
+        )
+    ),
+    ToolDefinition(
+        name = "execute_python",
+        description = "Run arbitrary Python code with access to Pillow, pypdf, reportlab, docx, openpyxl, pptx. Use as a last resort when other tools cannot accomplish the task.",
+        mapOf(
+            "code" to ParameterDef("string", "Python code to execute"),
+            "input_files" to ParameterDef("string", "Available file paths (comma-separated)", required = false),
+            "output_path" to ParameterDef("string", "Output path (if applicable)", required = false)
+        )
+    )
 )
