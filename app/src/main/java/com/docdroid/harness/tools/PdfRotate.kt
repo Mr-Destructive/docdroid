@@ -47,30 +47,36 @@ class PdfRotate(private val context: Context) : Tool {
             val doc = PdfDocument()
             for (pageIndex in 0 until totalPages) {
                 val page = renderer.openPage(pageIndex)
-                val pageInfo = PdfDocument.PageInfo.Builder(
-                    page.width, page.height, pageIndex + 1
-                ).create()
+                val rotating = pageIndex in pagesToRotate
+                val swapDims = rotating && (angle == 90 || angle == 270)
+
+                val outW = if (swapDims) page.height else page.width
+                val outH = if (swapDims) page.width else page.height
+
+                val pageInfo = PdfDocument.PageInfo.Builder(outW, outH, pageIndex + 1).create()
                 val pdfPage = doc.startPage(pageInfo)
                 val canvas = pdfPage.canvas
 
                 val bitmap = Bitmap.createBitmap(page.width, page.height, Bitmap.Config.ARGB_8888)
                 page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
 
-                if (pageIndex in pagesToRotate) {
-                    canvas.save()
+                canvas.save()
+                if (rotating) {
                     when (angle) {
-                        90 -> canvas.rotate(90f, page.width / 2f, page.height / 2f)
-                        180 -> canvas.rotate(180f, page.width / 2f, page.height / 2f)
-                        270 -> canvas.rotate(270f, page.width / 2f, page.height / 2f)
+                        90 -> {
+                            canvas.rotate(90f, outW / 2f, outH / 2f)
+                            canvas.translate(outW - page.width.toFloat(), 0f)
+                        }
+                        180 -> canvas.rotate(180f, outW / 2f, outH / 2f)
+                        270 -> {
+                            canvas.rotate(270f, outW / 2f, outH / 2f)
+                            canvas.translate(0f, outH - page.height.toFloat())
+                        }
                     }
                 }
-
                 canvas.drawBitmap(bitmap, 0f, 0f, null)
+                canvas.restore()
                 bitmap.recycle()
-
-                if (pageIndex in pagesToRotate) {
-                    canvas.restore()
-                }
 
                 doc.finishPage(pdfPage)
                 page.close()

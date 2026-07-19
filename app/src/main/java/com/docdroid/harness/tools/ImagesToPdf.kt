@@ -39,6 +39,8 @@ class ImagesToPdf(private val context: Context) : Tool {
                 }
                 BitmapFactory.decodeFile(imageFile.absolutePath, options)
 
+                if (options.outWidth <= 0 || options.outHeight <= 0) continue
+
                 val pageInfo = PdfDocument.PageInfo.Builder(
                     options.outWidth, options.outHeight, index + 1
                 ).create()
@@ -62,9 +64,10 @@ class ImagesToPdf(private val context: Context) : Tool {
 
                     bitmap.recycle()
                     addedImages.add(imageFile.name)
+                    doc.finishPage(page)
+                } else {
+                    doc.finishPage(page)
                 }
-
-                doc.finishPage(page)
             }
 
             if (addedImages.isEmpty()) {
