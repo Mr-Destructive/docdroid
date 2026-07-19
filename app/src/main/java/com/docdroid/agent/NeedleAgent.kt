@@ -37,38 +37,87 @@ class NeedleAgent : NeedleEngine {
 
     suspend fun initFromAssets(context: Context): Boolean = withContext(Dispatchers.IO) {
         try {
-            val modelDir = File(context.filesDir, "models")
+            val modelDir = File(context.filesDir, "models/needle")
             modelDir.mkdirs()
 
-            val assetFiles = context.assets.list("") ?: emptyArray()
-            val cactFiles = assetFiles.filter { it.endsWith(".cact") }
+            val rootFiles = context.assets.list("") ?: emptyArray()
+            val needleDir = rootFiles.firstOrNull { it == "needle" }
 
-            if (cactFiles.isEmpty()) {
-                android.util.Log.w(TAG, "No .cact model files found in assets")
-                initError = "No model files in APK assets"
-                return@withContext false
-            }
+            if (needleDir != null) {
+                android.util.Log.i(TAG, "Found 'needle' directory in assets, extracting...")
+                extractAssetDir(context, "needle", "needle", modelDir)
+            } else {
+                android.util.Log.i(TAG, "No 'needle' dir, looking for individual model files")
+                val allAssets = mutableListOf<String>()
+                listAssetFiles(context, "", allAssets)
+                android.util.Log.i(TAG, "Found ${allAssets.size} asset files")
 
-            val assetName = cactFiles.first()
-            val destFile = File(modelDir, assetName)
+                if (allAssets.isEmpty()) {
+                    initError = "No files found in APK assets"
+                    return@withContext false
+                }
 
-            if (!destFile.exists() || destFile.length() == 0L) {
-                android.util.Log.i(TAG, "Extracting $assetName to ${destFile.absolutePath}")
-                context.assets.open(assetName).use { input ->
-                    destFile.outputStream().use { output ->
-                        input.copyTo(output)
+                allAssets.forEach { assetPath ->
+                    val destFile = File(modelDir, assetPath)
+                    destFile.parentFile?.mkdirs()
+                    if (!destFile.exists() || destFile.length() == 0L) {
+                        context.assets.open(assetPath).use { input ->
+                            destFile.outputStream().use { output ->
+                                input.copyTo(output)
+                            }
+                        }
                     }
                 }
             }
 
-            android.util.Log.i(TAG, "Model file ready: ${destFile.absolutePath} (${destFile.length()} bytes)")
-            init(destFile.absolutePath)
+            val modelFiles = modelDir.listFiles() ?: emptyArray()
+            android.util.Log.i(TAG, "Model directory has ${modelFiles.size} files: ${modelFiles.map { it.name }.take(10)}")
+
+            if (modelFiles.isEmpty()) {
+                initError = "Model extraction produced empty directory"
+                return@withContext false
+            }
+
+            android.util.Log.i(TAG, "Model directory ready: ${modelDir.absolutePath}")
+            init(modelDir.absolutePath)
             initialized
         } catch (e: Exception) {
             initialized = false
             initError = "Asset extraction failed: ${e.message}"
             android.util.Log.e(TAG, "Failed to extract model from assets", e)
             false
+        }
+    }
+
+    private fun extractAssetDir(context: Context, assetPath: String, rootAssetPath: String, destRoot: File) {
+        val children = context.assets.list(assetPath) ?: emptyArray()
+
+        if (children.isEmpty()) {
+            val relPath = assetPath.removePrefix("$rootAssetPath/")
+            val destFile = File(destRoot, relPath)
+            destFile.parentFile?.mkdirs()
+            if (!destFile.exists() || destFile.length() == 0L) {
+                context.assets.open(assetPath).use { input ->
+                    destFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+            }
+        } else {
+            children.forEach { child ->
+                extractAssetDir(context, "$assetPath/$child", rootAssetPath, destRoot)
+            }
+        }
+    }
+
+    private fun listAssetFiles(context: Context, path: String, result: MutableList<String>) {
+        val children = context.assets.list(path) ?: emptyArray()
+        if (children.isEmpty()) {
+            result.add(path)
+        } else {
+            children.forEach { child ->
+                listAssetFiles(context, if (path.isEmpty()) child else "$path/$child", result)
+            }
         }
     }
 
