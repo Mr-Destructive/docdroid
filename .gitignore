@@ -1,3 +1,4 @@
+# Android
 *.iml
 .gradle
 /local.properties
@@ -14,9 +15,20 @@ local.properties
 *.aab
 *.keystore
 *.jks
+
+# Native libs (built separately)
+/app/src/main/jniLibs/
+
+# Model files (too large for git)
+/app/src/main/assets/needle/*.bin
+/app/src/main/assets/needle/*.pkl
+/app/src/main/assets/needle/*.safetensors
+/app/src/main/assets/needle/*.zip
+/app/src/main/assets/needle/*.model
+/app/src/main/assets/needle/*.vocab
+
+# Python
 __pycache__/
 *.pyc
-*.pyo
 .env
 node_modules/
-session-ses_08ad.md

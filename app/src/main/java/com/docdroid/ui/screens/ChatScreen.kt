@@ -1,131 +1,39 @@
 package com.docdroid.ui.screens
 
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.docdroid.agent.AgentEvent
-import com.docdroid.agent.AgentLoop
-import com.docdroid.data.ChatRepository
-import com.docdroid.model.*
-import com.docdroid.ui.components.*
-import com.docdroid.ui.theme.*
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
-
-private data class SuggestionChip(
-    val icon: androidx.compose.ui.graphics.vector.ImageVector,
-    val label: String,
-    val prompt: String
-)
-
-private val suggestionChips = listOf(
-    SuggestionChip(Icons.Default.PictureAsPdf, "Merge PDFs", "Merge these PDFs into one document"),
-    SuggestionChip(Icons.Default.PictureAsPdf, "Add Watermark", "Add a DRAFT watermark to all pages"),
-    SuggestionChip(Icons.Default.PictureAsPdf, "Extract Text", "Extract text from this PDF"),
-    SuggestionChip(Icons.Default.Image, "Resize Image", "Resize this image to 800x600"),
-    SuggestionChip(Icons.Default.Image, "Compress Image", "Compress this image to under 500KB"),
-    SuggestionChip(Icons.Default.TextSnippet, "DOCX to PDF", "Convert this Word document to PDF"),
-    SuggestionChip(Icons.Default.TableChart, "Read Spreadsheet", "Read and summarize this spreadsheet"),
-    SuggestionChip(Icons.Default.Code, "Run Python", "Run Python code to process my files"),
-)
-
-private fun resolveDocumentFile(context: android.content.Context, uri: Uri, workDir: java.io.File): DocumentFile? {
-    return try {
-        val resolver = context.contentResolver
-        val mimeType = resolver.getType(uri) ?: "application/octet-stream"
-        var name = uri.lastPathSegment ?: "unknown"
-        var size = 0L
-
-        resolver.query(uri, null, null, null, null)?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                val nameIdx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                if (nameIdx >= 0) {
-                    name = cursor.getString(nameIdx) ?: name
-                }
-                val sizeIdx = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
-                if (sizeIdx >= 0) {
-                    size = cursor.getLong(sizeIdx)
-                }
-            }
-        }
-
-        val destFile = java.io.File(workDir, name)
-        resolver.openInputStream(uri)?.use { input ->
-            destFile.outputStream().use { output ->
-                input.copyTo(output)
-            }
-        }
-
-        DocumentFile(
-            name = name,
-            path = destFile.absolutePath,
-            mimeType = mimeType,
-            size = if (size > 0) size else destFile.length(),
-            uri = uri.toString()
-        )
-    } catch (e: Exception) {
-        android.util.Log.e("ChatScreen", "Failed to resolve document: ${e.message}")
-        null
-    }
-}
+import com.docdroid.ui.components.InputBar
+import com.docdroid.ui.components.MessageBubble
+import com.docdroid.ui.viewmodel.ChatViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
-    agentLoop: AgentLoop,
-    repository: ChatRepository,
-    onFilePicked: (List<DocumentFile>) -> Unit
+    viewModel: ChatViewModel
 ) {
-    val messages by repository.messages.collectAsState()
+    val messages by viewModel.messages.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val engineStatus by viewModel.engineStatus.collectAsState()
     val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
-    var isLoading by remember { mutableStateOf(false) }
-    var pendingFiles by remember { mutableStateOf<List<DocumentFile>>(emptyList()) }
-    var inputText by remember { mutableStateOf("") }
-    val context = LocalContext.current
-    val hasLaunched = remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        if (!hasLaunched.value && messages.isEmpty()) {
-            hasLaunched.value = true
-            repository.addAssistantMessage(
-                "Hey! I'm DocDroid, your AI document assistant powered by Needle.\n\n" +
-                "Attach any file and tell me what to do. I can handle PDFs, images, Word docs, spreadsheets, " +
-                "presentations, audio, video, and more.\n\n" +
-                "Try attaching a file and tapping one of the suggestions below!"
-            )
-        }
-    }
-
-    val filePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenMultipleDocuments()
-    ) { uris: List<Uri> ->
-        if (uris.isNullOrEmpty()) return@rememberLauncherForActivityResult
-        val workDir = java.io.File(context.filesDir, "working").also { it.mkdirs() }
-        val files = uris.mapNotNull { uri -> resolveDocumentFile(context, uri, workDir) }
-        if (files.isNotEmpty()) {
-            pendingFiles = pendingFiles + files
-            onFilePicked(files)
+    // Auto-scroll to bottom when new messages arrive
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
         }
     }
 
@@ -133,27 +41,33 @@ fun ChatScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.SmartToy,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(28.dp)
+                    Column {
+                        Text(
+                            "DocDroid",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp
                         )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text("DocDroid", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                            Text(
-                                "Powered by Needle",
-                                fontSize = 11.sp,
-                                color = Color.White.copy(alpha = 0.7f)
-                            )
+                        val statusText = when (engineStatus) {
+                            is ChatViewModel.EngineStatus.Loading -> "Loading model..."
+                            is ChatViewModel.EngineStatus.Ready -> "Ready"
+                            is ChatViewModel.EngineStatus.Error -> "Error"
+                        }
+                        Text(
+                            statusText,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+                },
+                actions = {
+                    if (messages.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.clearChat() }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Clear chat")
                         }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Primary,
-                    titleContentColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         }
@@ -162,110 +76,29 @@ fun ChatScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(Background)
         ) {
+            // Message list
             LazyColumn(
-                state = listState,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
+                state = listState,
                 contentPadding = PaddingValues(vertical = 8.dp)
             ) {
                 if (messages.isEmpty()) {
-                    item(key = "welcome") { WelcomeHeader() }
+                    item {
+                        WelcomeMessage(engineStatus)
+                    }
                 }
 
                 items(messages, key = { it.id }) { message ->
-                    ChatBubble(message = message)
-                }
-
-                if (messages.size <= 1) {
-                    item(key = "suggestions") {
-                        SuggestionChipsRow(
-                            chips = suggestionChips,
-                            onChipClick = { prompt ->
-                                inputText = prompt
-                            },
-                            hasFiles = pendingFiles.isNotEmpty(),
-                            onAttachFiles = { filePickerLauncher.launch(arrayOf("*/*")) }
-                        )
-                    }
+                    MessageBubble(message = message)
                 }
             }
 
-            if (pendingFiles.isNotEmpty()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    pendingFiles.forEach { file ->
-                        FileAttachment(
-                            file = file,
-                            onRemove = {
-                                pendingFiles = pendingFiles.filter { it.id != file.id }
-                            }
-                        )
-                    }
-                }
-            }
-
-            if (isLoading) {
-                LinearProgressIndicator(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = Primary
-                )
-            }
-
-            MessageInput(
-                text = inputText,
-                onTextChange = { inputText = it },
-                onSendMessage = { text ->
-                    if (text.isBlank()) return@MessageInput
-                    isLoading = true
-                    repository.addUserMessage(text, pendingFiles)
-                    val files = pendingFiles
-                    pendingFiles = emptyList()
-                    inputText = ""
-
-                    scope.launch {
-                        agentLoop.processMessage(text, files).collectLatest { event ->
-                            when (event) {
-                                is AgentEvent.Thinking -> {
-                                    repository.addSystemMessage(event.message)
-                                }
-                                is AgentEvent.Response -> {
-                                    repository.addAssistantMessage(
-                                        content = event.message,
-                                        toolCalls = event.results.map { r ->
-                                            ToolCallResult(
-                                                toolName = r.toolName,
-                                                status = r.status,
-                                                result = r.result,
-                                                outputPath = r.outputPath,
-                                                error = r.error,
-                                                executionTimeMs = r.executionTimeMs
-                                            )
-                                        }
-                                    )
-                                    isLoading = false
-                                }
-                                is AgentEvent.Error -> {
-                                    repository.addAssistantMessage("Error: ${event.message}")
-                                    isLoading = false
-                                }
-                                is AgentEvent.CodeGenerated -> {
-                                    repository.addSystemMessage("Generated Python code:\n${event.code.take(500)}")
-                                }
-                                else -> {}
-                            }
-                        }
-                    }
-                },
-                onAttachFiles = {
-                    filePickerLauncher.launch(arrayOf("*/*"))
-                },
+            // Input bar
+            InputBar(
+                onSend = { viewModel.sendMessage(it) },
                 isLoading = isLoading
             )
         }
@@ -273,161 +106,43 @@ fun ChatScreen(
 }
 
 @Composable
-private fun WelcomeHeader() {
+private fun WelcomeMessage(status: ChatViewModel.EngineStatus) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Card(
-            modifier = Modifier.size(72.dp),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Primary)
-        ) {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                Icon(
-                    imageVector = Icons.Default.SmartToy,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(40.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
         Text(
-            text = "What can I help with?",
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold,
-            color = OnBackground
+            text = " ",
+            fontSize = 48.sp
         )
-
-        Spacer(modifier = Modifier.height(6.dp))
-
+        Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "Attach files and I'll take care of the rest.",
-            fontSize = 14.sp,
-            color = ThinkingColor,
+            text = "Welcome to DocDroid",
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
-    }
-}
-
-@Composable
-private fun SuggestionChipsRow(
-    chips: List<SuggestionChip>,
-    onChipClick: (String) -> Unit,
-    hasFiles: Boolean,
-    onAttachFiles: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        if (!hasFiles) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onAttachFiles() },
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = Surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.AttachFile,
-                        contentDescription = null,
-                        tint = Primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column {
-                        Text(
-                            "Attach a file to get started",
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 14.sp,
-                            color = OnBackground
-                        )
-                        Text(
-                            "PDFs, images, docs, spreadsheets, audio, video...",
-                            fontSize = 12.sp,
-                            color = ThinkingColor
-                        )
-                    }
-                    Spacer(modifier = Modifier.weight(1f))
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = null,
-                        tint = ThinkingColor
-                    )
-                }
-            }
-        }
-
+        Spacer(modifier = Modifier.height(8.dp))
         Text(
-            "Quick actions",
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            color = ThinkingColor,
-            modifier = Modifier.padding(horizontal = 4.dp)
+            text = when (status) {
+                is ChatViewModel.EngineStatus.Loading -> "Loading the Needle model..."
+                is ChatViewModel.EngineStatus.Ready ->
+                    "Ask me to merge PDFs, extract text, rotate pages, and more.\n\n" +
+                    "Try:\n" +
+                    "• \"Merge report.pdf and appendix.pdf\"\n" +
+                    "• \"Extract text from contract.pdf\"\n" +
+                    "• \"Add CONFIDENTIAL watermark to every page\"\n" +
+                    "• \"Convert these images to a PDF\""
+                is ChatViewModel.EngineStatus.Error ->
+                    "Error: ${status.message}\n\nMake sure the model files are in assets/needle/"
+            },
+            fontSize = 14.sp,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+            lineHeight = 22.sp
         )
-
-        val rows = chips.chunked(2)
-        rows.forEach { row ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                row.forEach { chip ->
-                    SuggestionChipItem(
-                        chip = chip,
-                        onClick = { onChipClick(chip.prompt) },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                if (row.size == 1) {
-                    Spacer(modifier = Modifier.weight(1f))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SuggestionChipItem(
-    chip: SuggestionChip,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier.clickable { onClick() },
-        shape = RoundedCornerShape(10.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = chip.icon,
-                contentDescription = null,
-                tint = Primary,
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = chip.label,
-                fontSize = 13.sp,
-                color = OnBackground
-            )
-        }
     }
 }

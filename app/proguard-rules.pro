@@ -1,6 +1,2 @@
--dontwarn com.chaquo.python.**
--keep class com.chaquo.python.** { *; }
--keep class com.docdroid.python.** { *; }
--keepclassmembers class * {
-    @com.chaquo.python.PyObject <methods>;
-}
+-keep class com.docdroid.engine.CactusJNI { *; }
+-keep class com.docdroid.engine.NeedleEngine { *; }
