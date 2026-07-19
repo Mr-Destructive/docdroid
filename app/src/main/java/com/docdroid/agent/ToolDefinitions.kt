@@ -29,17 +29,25 @@ fun buildToolsJson(): String {
         append("[")
         tools.forEachIndexed { i, tool ->
             if (i > 0) append(",")
-            append("""{"name":"${tool.name}","description":${escapeJson(tool.description)},"parameters":{""")
-            tool.parameters.entries.forEachIndexed { j, (key, param) ->
-                if (j > 0) append(",")
+            append("""{"type":"function","function":{""")
+            append(""""name":"${tool.name}","description":${escapeJson(tool.description)},"parameters":{""")
+            append(""""type":"object","properties":{""")
+            var first = true
+            tool.parameters.entries.forEach { (key, param) ->
+                if (!first) append(",")
+                first = false
                 append(""""$key":{""")
-                append(""""type":"${param.type}","description":${escapeJson(param.description)},"required":${param.required}""")
+                append(""""type":"${param.type}","description":${escapeJson(param.description)}""")
                 if (param.enum != null) {
                     append(",\"enum\":[${param.enum.joinToString(",") { "\"$it\"" }}]")
                 }
                 append("}")
             }
-            append("}")
+            append("""},"required":[""")
+            val required = tool.parameters.entries.filter { it.value.required }.map { "\"${it.key}\"" }
+            append(required.joinToString(","))
+            append("]")
+            append("}}}")
         }
         append("]")
     }

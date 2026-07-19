@@ -70,26 +70,34 @@ class ToolDefinitionsTest {
     }
 
     @Test
-    fun `buildToolsJson each entry has name, description, parameters`() {
+    fun `buildToolsJson each entry has type function and function wrapper`() {
         val jsonStr = buildToolsJson()
         val arr = json.parseToJsonElement(jsonStr) as JsonArray
         for (i in arr.indices) {
             val obj = arr[i] as JsonObject
-            assertTrue("Tool $i should have 'name'", obj.containsKey("name"))
-            assertTrue("Tool $i should have 'description'", obj.containsKey("description"))
-            assertTrue("Tool $i should have 'parameters'", obj.containsKey("parameters"))
+            assertTrue("Tool $i should have 'type'='function'", obj["type"]?.jsonPrimitive?.content == "function")
+            assertTrue("Tool $i should have 'function' object", obj.containsKey("function"))
+            val fn = obj["function"] as JsonObject
+            assertTrue("Tool $i function should have 'name'", fn.containsKey("name"))
+            assertTrue("Tool $i function should have 'description'", fn.containsKey("description"))
+            assertTrue("Tool $i function should have 'parameters'", fn.containsKey("parameters"))
             assertTrue("Tool $i name should be non-empty",
-                (obj["name"] as JsonPrimitive).content.isNotEmpty())
+                (fn["name"] as JsonPrimitive).content.isNotEmpty())
         }
     }
 
     @Test
-    fun `buildToolsJson parameter entries have type and description`() {
+    fun `buildToolsJson parameter entries have type, description, and properties wrapper`() {
         val jsonStr = buildToolsJson()
         val arr = json.parseToJsonElement(jsonStr) as JsonArray
         val firstTool = arr[0] as JsonObject
-        val params = firstTool["parameters"] as JsonObject
-        for ((key, value) in params) {
+        val fn = firstTool["function"] as JsonObject
+        val params = fn["parameters"] as JsonObject
+        assertTrue("Parameters should have 'type'='object'", params["type"]?.jsonPrimitive?.content == "object")
+        assertTrue("Parameters should have 'properties'", params.containsKey("properties"))
+        assertTrue("Parameters should have 'required' array", params.containsKey("required"))
+        val properties = params["properties"] as JsonObject
+        for ((key, value) in properties) {
             val param = value as JsonObject
             assertTrue("Param '$key' should have 'type'", param.containsKey("type"))
             assertTrue("Param '$key' should have 'description'", param.containsKey("description"))
@@ -133,6 +141,6 @@ class ToolDefinitionsTest {
     fun `tool JSON is compact enough for 26M model`() {
         val jsonStr = buildToolsJson()
         val estTokens = jsonStr.length / 4
-        assertTrue("Tool JSON ~$estTokens tokens, should be under 3000", estTokens < 3000)
+        assertTrue("Tool JSON ~$estTokens tokens, should be under 4000", estTokens < 4000)
     }
 }

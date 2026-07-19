@@ -16,6 +16,11 @@ interface NeedleEngine {
     fun getInitError(): String? = null
 }
 
+private const val SYSTEM_PROMPT = """You are a document processing assistant. You have access to tools for manipulating files.
+When the user asks to perform an operation, respond with exactly one JSON object: {"name":"tool_name","arguments":{"param":"value"}}.
+Choose the most appropriate tool and fill in the required arguments. Use file paths exactly as provided.
+Do not explain. Do not add any text before or after the JSON."""
+
 class NeedleAgent : NeedleEngine {
 
     private var modelHandle: Long = 0L
@@ -133,22 +138,40 @@ class NeedleAgent : NeedleEngine {
             try {
                 val messages = JSONArray().apply {
                     put(JSONObject().apply {
+                        put("role", "system")
+                        put("content", SYSTEM_PROMPT)
+                    })
+                    put(JSONObject().apply {
                         put("role", "user")
                         put("content", query)
                     })
                 }
 
+                val options = JSONObject().apply {
+                    put("force_tools", true)
+                    put("max_tokens", 256)
+                    put("temperature", 0.0)
+                    put("top_p", 0.0)
+                    put("tool_rag_top_k", 0)
+                    put("confidence_threshold", 0.0)
+                    put("auto_handoff", false)
+                }
+
                 val resultJson = cactusComplete(
                     modelHandle,
                     messages.toString(),
-                    null,
+                    options.toString(),
                     toolsJson,
                     null
                 )
 
+                android.util.Log.d(TAG, "Raw response: ${resultJson.take(500)}")
+
                 val toolCalls = parseResponse(resultJson)
+                android.util.Log.d(TAG, "Parsed ${toolCalls.size} tool calls: ${toolCalls.map { it.name }}")
                 Result.success(toolCalls)
             } catch (e: Exception) {
+                android.util.Log.e(TAG, "Query failed: ${e.message}", e)
                 Result.failure(e)
             }
         }
@@ -156,36 +179,72 @@ class NeedleAgent : NeedleEngine {
     private fun parseResponse(responseJson: String): List<ToolCall> {
         return try {
             val trimmed = responseJson.trim()
-            val json = if (trimmed.startsWith("[")) {
-                JSONArray(trimmed)
-            } else {
-                val obj = JSONObject(trimmed)
-                val text = obj.optString("response", trimmed)
-                if (text.startsWith("[")) {
-                    JSONArray(text)
-                } else {
-                    return extractToolCallsFromText(text)
-                }
+
+            if (trimmed.isEmpty()) {
+                android.util.Log.w(TAG, "Empty response from Cactus")
+                return emptyList()
             }
 
-            val calls = mutableListOf<ToolCall>()
-            for (i in 0 until json.length()) {
-                val item = json.getJSONObject(i)
-                val name = item.optString("name", "")
-                if (name.isEmpty()) continue
+            val json = JSONObject(trimmed)
 
-                val args = mutableMapOf<String, String>()
-                val argsObj = item.optJSONObject("arguments") ?: item.optJSONObject("parameters")
-                argsObj?.keys()?.forEach { key ->
-                    args[key] = argsObj.optString(key, "")
+            if (json.has("function_calls")) {
+                val calls = mutableListOf<ToolCall>()
+                val functionCalls = json.optJSONArray("function_calls")
+                if (functionCalls != null) {
+                    for (i in 0 until functionCalls.length()) {
+                        val item = functionCalls.getJSONObject(i)
+                        val name = item.optString("name", "")
+                        if (name.isEmpty()) continue
+
+                        val args = mutableMapOf<String, String>()
+                        val argsObj = item.optJSONObject("arguments")
+                        argsObj?.keys()?.forEach { key ->
+                            args[key] = argsObj.optString(key, "")
+                        }
+                        calls.add(ToolCall(name = name, arguments = args))
+                    }
                 }
-                calls.add(ToolCall(name = name, arguments = args))
+                return calls
             }
-            calls
-        } catch (e: Exception) {
-            android.util.Log.e(TAG, "Parse error: ${e.message}")
+
+            val text = json.optString("response", "").trim()
+            if (text.isNotEmpty()) {
+                return extractToolCallsFromText(text)
+            }
+
+            if (trimmed.startsWith("[")) {
+                return parseRawJsonArray(trimmed)
+            }
+
+            android.util.Log.w(TAG, "Could not parse response: ${trimmed.take(200)}")
             emptyList()
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "Parse error: ${e.message}", e)
+            try {
+                val trimmed = responseJson.trim()
+                if (trimmed.startsWith("[")) parseRawJsonArray(trimmed)
+                else extractToolCallsFromText(trimmed)
+            } catch (e2: Exception) {
+                emptyList()
+            }
         }
+    }
+
+    private fun parseRawJsonArray(jsonStr: String): List<ToolCall> {
+        val json = JSONArray(jsonStr)
+        val calls = mutableListOf<ToolCall>()
+        for (i in 0 until json.length()) {
+            val item = json.getJSONObject(i)
+            val name = item.optString("name", "")
+            if (name.isEmpty()) continue
+            val args = mutableMapOf<String, String>()
+            val argsObj = item.optJSONObject("arguments")
+            argsObj?.keys()?.forEach { key ->
+                args[key] = argsObj.optString(key, "")
+            }
+            calls.add(ToolCall(name = name, arguments = args))
+        }
+        return calls
     }
 
     private fun extractToolCallsFromText(text: String): List<ToolCall> {
