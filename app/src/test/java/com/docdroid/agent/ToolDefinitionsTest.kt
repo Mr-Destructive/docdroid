@@ -42,41 +42,24 @@ class ToolDefinitionsTest {
     fun `consolidated tools include expected names`() {
         val defs = getAllToolDefinitions()
         val names = defs.map { it.name }.toSet()
-
-        assertTrue("pdf_merge_split should exist", names.contains("pdf_merge_split"))
-        assertTrue("pdf_pages should exist", names.contains("pdf_pages"))
-        assertTrue("pdf_watermark should exist", names.contains("pdf_watermark"))
-        assertTrue("pdf_extract should exist", names.contains("pdf_extract"))
-        assertTrue("pdf_security should exist", names.contains("pdf_security"))
-        assertTrue("pdf_forms should exist", names.contains("pdf_forms"))
-        assertTrue("pdf_convert should exist", names.contains("pdf_convert"))
-        assertTrue("pdf_info should exist", names.contains("pdf_info"))
-        assertTrue("image_transform should exist", names.contains("image_transform"))
-        assertTrue("image_adjust should exist", names.contains("image_adjust"))
-        assertTrue("image_filter should exist", names.contains("image_filter"))
-        assertTrue("image_overlay should exist", names.contains("image_overlay"))
-        assertTrue("image_convert should exist", names.contains("image_convert"))
-        assertTrue("image_batch should exist", names.contains("image_batch"))
-        assertTrue("image_create_qr should exist", names.contains("image_create_qr"))
-        assertTrue("text_read_write should exist", names.contains("text_read_write"))
-        assertTrue("text_edit should exist", names.contains("text_edit"))
-        assertTrue("docx_operation should exist", names.contains("docx_operation"))
-        assertTrue("markdown_to_pdf should exist", names.contains("markdown_to_pdf"))
-        assertTrue("spreadsheet_operation should exist", names.contains("spreadsheet_operation"))
-        assertTrue("presentation_operation should exist", names.contains("presentation_operation"))
-        assertTrue("audio_operation should exist", names.contains("audio_operation"))
-        assertTrue("video_operation should exist", names.contains("video_operation"))
-        assertTrue("archive_operation should exist", names.contains("archive_operation"))
-        assertTrue("ocr_extract_text should exist", names.contains("ocr_extract_text"))
-        assertTrue("get_file_info should exist", names.contains("get_file_info"))
-        assertTrue("compare_files should exist", names.contains("compare_files"))
-        assertTrue("execute_python should exist", names.contains("execute_python"))
+        val expected = setOf(
+            "pdf_edit", "pdf_pages", "pdf_watermark", "pdf_extract", "pdf_security",
+            "pdf_forms", "pdf_convert", "pdf_info",
+            "image_edit", "image_overlay", "image_convert", "image_qr",
+            "text_file", "docx", "markdown_to_pdf",
+            "spreadsheet", "presentation",
+            "audio", "video", "archive",
+            "ocr", "file_info", "execute_python"
+        )
+        expected.forEach { name ->
+            assertTrue("$name should exist", names.contains(name))
+        }
     }
 
     @Test
-    fun `consolidated tool count is manageable for small model`() {
+    fun `tool count fits 26M model budget`() {
         val defs = getAllToolDefinitions()
-        assertTrue("Expected ~23-30 consolidated tools, got ${defs.size}", defs.size in 20..35)
+        assertTrue("Expected 20-25 tools for 26M model, got ${defs.size}", defs.size in 20..25)
     }
 
     @Test
@@ -129,9 +112,9 @@ class ToolDefinitionsTest {
     @Test
     fun `consolidated tools have operation parameter where applicable`() {
         val defs = getAllToolDefinitions()
-        val toolsWithOperation = defs.filter { it.parameters.containsKey("operation") }
-        assertTrue("Expected multiple tools with 'operation' param, got ${toolsWithOperation.size}",
-            toolsWithOperation.size >= 15)
+        val toolsWithOp = defs.filter { it.parameters.containsKey("operation") }
+        assertTrue("Expected >=15 tools with operation param, got ${toolsWithOp.size}",
+            toolsWithOp.size >= 15)
     }
 
     @Test
@@ -144,5 +127,12 @@ class ToolDefinitionsTest {
             assertEquals(tool.description, deserialized.description)
             assertEquals(tool.parameters.size, deserialized.parameters.size)
         }
+    }
+
+    @Test
+    fun `tool JSON is compact enough for 26M model`() {
+        val jsonStr = buildToolsJson()
+        val estTokens = jsonStr.length / 4
+        assertTrue("Tool JSON ~$estTokens tokens, should be under 3000", estTokens < 3000)
     }
 }
