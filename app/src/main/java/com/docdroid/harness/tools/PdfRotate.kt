@@ -1,6 +1,7 @@
 package com.docdroid.harness.tools
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.pdf.PdfDocument
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
@@ -52,22 +53,20 @@ class PdfRotate(private val context: Context) : Tool {
                 val pdfPage = doc.startPage(pageInfo)
                 val canvas = pdfPage.canvas
 
+                val bitmap = Bitmap.createBitmap(page.width, page.height, Bitmap.Config.ARGB_8888)
+                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+
                 if (pageIndex in pagesToRotate) {
                     canvas.save()
                     when (angle) {
-                        90 -> {
-                            canvas.rotate(90f, page.width / 2f, page.height / 2f)
-                        }
-                        180 -> {
-                            canvas.rotate(180f, page.width / 2f, page.height / 2f)
-                        }
-                        270 -> {
-                            canvas.rotate(270f, page.width / 2f, page.height / 2f)
-                        }
+                        90 -> canvas.rotate(90f, page.width / 2f, page.height / 2f)
+                        180 -> canvas.rotate(180f, page.width / 2f, page.height / 2f)
+                        270 -> canvas.rotate(270f, page.width / 2f, page.height / 2f)
                     }
                 }
 
-                page.render(canvas, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                canvas.drawBitmap(bitmap, 0f, 0f, null)
+                bitmap.recycle()
 
                 if (pageIndex in pagesToRotate) {
                     canvas.restore()

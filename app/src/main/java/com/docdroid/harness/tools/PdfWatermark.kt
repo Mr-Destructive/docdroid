@@ -1,6 +1,7 @@
 package com.docdroid.harness.tools
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -44,10 +45,13 @@ class PdfWatermark(private val context: Context) : Tool {
                 val page = renderer.openPage(pageIndex)
                 val pageInfo = PdfDocument.PageInfo.Builder(page.width, page.height, pageIndex + 1).create()
                 val pdfPage = doc.startPage(pageInfo)
-
-                // Render original page content
                 val canvas = pdfPage.canvas
-                page.render(canvas, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+
+                // Render original page content to bitmap then draw on canvas
+                val bitmap = Bitmap.createBitmap(page.width, page.height, Bitmap.Config.ARGB_8888)
+                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                canvas.drawBitmap(bitmap, 0f, 0f, null)
+                bitmap.recycle()
 
                 // Draw watermark overlay
                 val paint = Paint().apply {

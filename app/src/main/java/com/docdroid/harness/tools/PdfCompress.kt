@@ -1,6 +1,7 @@
 package com.docdroid.harness.tools
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.pdf.PdfDocument
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
@@ -46,7 +47,10 @@ class PdfCompress(private val context: Context) : Tool {
                 val newHeight = (page.height * scale).toInt()
                 val pageInfo = PdfDocument.PageInfo.Builder(newWidth, newHeight, pageIndex + 1).create()
                 val pdfPage = doc.startPage(pageInfo)
-                page.render(pdfPage.canvas, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                val bitmap = Bitmap.createBitmap(newWidth, newHeight, Bitmap.Config.ARGB_8888)
+                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                pdfPage.canvas.drawBitmap(bitmap, 0f, 0f, null)
+                bitmap.recycle()
                 doc.finishPage(pdfPage)
                 page.close()
             }

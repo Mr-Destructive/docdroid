@@ -1,6 +1,7 @@
 package com.docdroid.harness.tools
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.pdf.PdfDocument
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
@@ -48,7 +49,10 @@ class PdfSplit(private val context: Context) : Tool {
                         page.width, page.height, doc.pages.size + 1
                     ).create()
                     val pdfPage = doc.startPage(pageInfo)
-                    page.render(pdfPage.canvas, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                    val bitmap = Bitmap.createBitmap(page.width, page.height, Bitmap.Config.ARGB_8888)
+                    page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                    pdfPage.canvas.drawBitmap(bitmap, 0f, 0f, null)
+                    bitmap.recycle()
                     doc.finishPage(pdfPage)
                     page.close()
                 }
