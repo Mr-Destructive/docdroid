@@ -70,34 +70,30 @@ class ToolDefinitionsTest {
     }
 
     @Test
-    fun `buildToolsJson each entry has type function and function wrapper`() {
+    fun `buildToolsJson uses flat format with name and parameters`() {
         val jsonStr = buildToolsJson()
         val arr = json.parseToJsonElement(jsonStr) as JsonArray
         for (i in arr.indices) {
             val obj = arr[i] as JsonObject
-            assertTrue("Tool $i should have 'type'='function'", obj["type"]?.jsonPrimitive?.content == "function")
-            assertTrue("Tool $i should have 'function' object", obj.containsKey("function"))
-            val fn = obj["function"] as JsonObject
-            assertTrue("Tool $i function should have 'name'", fn.containsKey("name"))
-            assertTrue("Tool $i function should have 'description'", fn.containsKey("description"))
-            assertTrue("Tool $i function should have 'parameters'", fn.containsKey("parameters"))
+            assertTrue("Tool $i should have 'name'", obj.containsKey("name"))
+            assertTrue("Tool $i should have 'description'", obj.containsKey("description"))
+            assertTrue("Tool $i should have 'parameters'", obj.containsKey("parameters"))
+            assertTrue("Tool $i should NOT have 'type' wrapper",
+                !obj.containsKey("type"))
+            assertTrue("Tool $i should NOT have 'function' wrapper",
+                !obj.containsKey("function"))
             assertTrue("Tool $i name should be non-empty",
-                (fn["name"] as JsonPrimitive).content.isNotEmpty())
+                (obj["name"] as JsonPrimitive).content.isNotEmpty())
         }
     }
 
     @Test
-    fun `buildToolsJson parameter entries have type, description, and properties wrapper`() {
+    fun `buildToolsJson parameters have type and description`() {
         val jsonStr = buildToolsJson()
         val arr = json.parseToJsonElement(jsonStr) as JsonArray
         val firstTool = arr[0] as JsonObject
-        val fn = firstTool["function"] as JsonObject
-        val params = fn["parameters"] as JsonObject
-        assertTrue("Parameters should have 'type'='object'", params["type"]?.jsonPrimitive?.content == "object")
-        assertTrue("Parameters should have 'properties'", params.containsKey("properties"))
-        assertTrue("Parameters should have 'required' array", params.containsKey("required"))
-        val properties = params["properties"] as JsonObject
-        for ((key, value) in properties) {
+        val params = firstTool["parameters"] as JsonObject
+        for ((key, value) in params) {
             val param = value as JsonObject
             assertTrue("Param '$key' should have 'type'", param.containsKey("type"))
             assertTrue("Param '$key' should have 'description'", param.containsKey("description"))
@@ -138,9 +134,41 @@ class ToolDefinitionsTest {
     }
 
     @Test
-    fun `tool JSON is compact enough for 26M model`() {
+    fun `tool JSON fits within 1024 token encoder limit`() {
         val jsonStr = buildToolsJson()
         val estTokens = jsonStr.length / 4
-        assertTrue("Tool JSON ~$estTokens tokens, should be under 4000", estTokens < 4000)
+        assertTrue("Full tool JSON ~$estTokens tokens, should be under 900 for 1024 encoder",
+            estTokens < 900)
+    }
+
+    @Test
+    fun `selectToolsForQuery returns subset of tools`() {
+        val selected = selectToolsForQuery("merge PDF files", maxTools = 8)
+        assertTrue("Should select at least 1 tool", selected.isNotEmpty())
+        assertTrue("Should select at most 8 tools", selected.size <= 8)
+        assertTrue("Should include pdf_edit for merge query",
+            selected.any { it.name == "pdf_edit" })
+    }
+
+    @Test
+    fun `selectToolsForQuery for image resize`() {
+        val selected = selectToolsForQuery("resize photo to 800x600", maxTools = 8)
+        assertTrue("Should include image_edit for resize query",
+            selected.any { it.name == "image_edit" })
+    }
+
+    @Test
+    fun `selectToolsForQuery falls back to defaults for vague query`() {
+        val selected = selectToolsForQuery("hello", maxTools = 8)
+        assertTrue("Should return some tools for vague query", selected.isNotEmpty())
+    }
+
+    @Test
+    fun `buildToolsJson with subset produces shorter JSON`() {
+        val allJson = buildToolsJson()
+        val subset = selectToolsForQuery("merge PDF files", maxTools = 8)
+        val subsetJson = buildToolsJson(subset)
+        assertTrue("Subset JSON (${subsetJson.length} chars) should be shorter than all (${allJson.length} chars)",
+            subsetJson.length < allJson.length)
     }
 }

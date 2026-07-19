@@ -23,8 +23,12 @@ class AgentLoop(
     fun processMessage(query: String, attachedFiles: List<DocumentFile> = emptyList()): Flow<AgentEvent> = flow {
         emit(AgentEvent.Thinking("Analyzing your request..."))
 
-        val toolsJson = buildToolsJson()
         val fullQuery = buildQuery(query, attachedFiles)
+        val selectedTools = selectToolsForQuery(fullQuery, maxTools = 8)
+        val toolsJson = buildToolsJson(selectedTools)
+
+        android.util.Log.d(TAG, "Tool RAG selected ${selectedTools.size} tools: ${selectedTools.map { it.name }}")
+        android.util.Log.d(TAG, "Tools JSON length: ${toolsJson.length} chars")
 
         val toolCallsResult = needleAgent.query(fullQuery, toolsJson)
 
@@ -115,5 +119,9 @@ class AgentLoop(
         bytes < 1024 -> "${bytes}B"
         bytes < 1024 * 1024 -> "${bytes / 1024}KB"
         else -> "${"%.1f".format(bytes / (1024.0 * 1024))}MB"
+    }
+
+    companion object {
+        private const val TAG = "AgentLoop"
     }
 }

@@ -23,34 +23,77 @@ data class ToolCall(
     val arguments: Map<String, String> = emptyMap()
 )
 
-fun buildToolsJson(): String {
-    val tools = getAllToolDefinitions()
-    return buildString {
-        append("[")
-        tools.forEachIndexed { i, tool ->
-            if (i > 0) append(",")
-            append("""{"type":"function","function":{""")
-            append(""""name":"${tool.name}","description":${escapeJson(tool.description)},"parameters":{""")
-            append(""""type":"object","properties":{""")
-            var first = true
-            tool.parameters.entries.forEach { (key, param) ->
-                if (!first) append(",")
-                first = false
-                append(""""$key":{""")
-                append(""""type":"${param.type}","description":${escapeJson(param.description)}""")
-                if (param.enum != null) {
-                    append(",\"enum\":[${param.enum.joinToString(",") { "\"$it\"" }}]")
-                }
-                append("}")
+fun buildToolsJson(): String = buildToolsJson(getAllToolDefinitions())
+
+fun buildToolsJson(tools: List<ToolDefinition>): String = buildString {
+    append("[")
+    tools.forEachIndexed { i, tool ->
+        if (i > 0) append(",")
+        append("""{"name":"${tool.name}","description":${escapeJson(tool.description)},"parameters":{""")
+        var first = true
+        tool.parameters.entries.forEach { (key, param) ->
+            if (!first) append(",")
+            first = false
+            append(""""$key":{""")
+            append(""""type":"${param.type}","description":${escapeJson(param.description)}""")
+            if (param.enum != null) {
+                append(",\"enum\":[${param.enum.joinToString(",") { "\"$it\"" }}]")
             }
-            append("""},"required":[""")
-            val required = tool.parameters.entries.filter { it.value.required }.map { "\"${it.key}\"" }
-            append(required.joinToString(","))
-            append("]")
-            append("}}}")
+            if (param.required) {
+                append(",\"required\":true")
+            }
+            append("}")
         }
-        append("]")
+        append("}}")
     }
+    append("]")
+}
+
+private val TOOL_KEYWORDS = mapOf(
+    "pdf_edit" to listOf("merge", "split", "crop", "resize", "pdf"),
+    "pdf_pages" to listOf("pages", "extract", "delete", "reorder", "rotate", "pdf"),
+    "pdf_watermark" to listOf("watermark", "page numbers", "header", "footer", "pdf"),
+    "pdf_extract" to listOf("extract text", "extract images", "extract tables", "metadata", "pdf"),
+    "pdf_security" to listOf("encrypt", "decrypt", "password", "flatten", "pdf"),
+    "pdf_forms" to listOf("form", "fill", "fields", "pdf"),
+    "pdf_convert" to listOf("pdf to image", "image to pdf", "pdf to html", "pdf to text", "overlay", "pdf"),
+    "pdf_info" to listOf("page count", "pdf info", "pdf size", "pdf metadata", "how many pages", "pdf"),
+    "image_edit" to listOf("resize", "crop", "rotate", "flip", "brightness", "contrast", "blur", "sharpen", "grayscale", "sepia", "invert", "filter", "image", "photo", "picture", "jpg", "jpeg", "png"),
+    "image_overlay" to listOf("text overlay", "watermark image", "border", "thumbnail", "image", "photo", "picture", "jpg", "jpeg", "png"),
+    "image_convert" to listOf("convert image", "compress image", "image format", "png to jpg", "jpg to png", "image", "photo", "picture", "jpg", "jpeg", "png", "webp"),
+    "image_qr" to listOf("qr code", "qrcode", "qr", "barcode"),
+    "text_file" to listOf("read file", "create file", "text file", "find replace", "word count", "txt", "text"),
+    "docx" to listOf("docx", "word", "document", "doc"),
+    "markdown_to_pdf" to listOf("markdown", "md to pdf", "md", ".md"),
+    "spreadsheet" to listOf("spreadsheet", "excel", "xlsx", "csv", "sheet", "cell", "sort"),
+    "presentation" to listOf("presentation", "powerpoint", "pptx", "ppt", "slides"),
+    "audio" to listOf("audio", "mp3", "aac", "wav", "flac", "song", "music"),
+    "video" to listOf("video", "mp4", "avi", "mov", "mkv", "trim video", "gif"),
+    "archive" to listOf("zip", "archive", "compress files", "extract zip"),
+    "ocr" to listOf("ocr", "extract text from image", "text from image", "scan"),
+    "file_info" to listOf("file type", "file info", "mime", "file size", "what type of file"),
+    "execute_python" to listOf("python", "code", "calculate", "run code", "script")
+)
+
+fun selectToolsForQuery(query: String, maxTools: Int = 8): List<ToolDefinition> {
+    val queryLower = query.lowercase()
+    val allDefs = getAllToolDefinitions()
+
+    val scored = allDefs.map { tool ->
+        val keywords = TOOL_KEYWORDS[tool.name] ?: emptyList()
+        val score = keywords.count { kw -> queryLower.contains(kw) }
+        tool to score
+    }.sortedByDescending { it.second }
+
+    val selected = scored.filter { it.second > 0 }.take(maxTools).map { it.first }
+
+    if (selected.size < 3) {
+        val defaults = listOf("pdf_info", "file_info", "execute_python", "pdf_edit", "pdf_extract", "image_edit", "text_file", "docx")
+        val fallbacks = allDefs.filter { it.name in defaults && it.name !in selected.map { t -> t.name } }
+        return (selected + fallbacks).take(maxTools)
+    }
+
+    return selected
 }
 
 private fun escapeJson(s: String): String =

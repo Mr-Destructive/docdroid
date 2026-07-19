@@ -16,11 +16,6 @@ interface NeedleEngine {
     fun getInitError(): String? = null
 }
 
-private const val SYSTEM_PROMPT = """You are a document processing assistant. You have access to tools for manipulating files.
-When the user asks to perform an operation, respond with exactly one JSON object: {"name":"tool_name","arguments":{"param":"value"}}.
-Choose the most appropriate tool and fill in the required arguments. Use file paths exactly as provided.
-Do not explain. Do not add any text before or after the JSON."""
-
 class NeedleAgent : NeedleEngine {
 
     private var modelHandle: Long = 0L
@@ -138,24 +133,20 @@ class NeedleAgent : NeedleEngine {
             try {
                 val messages = JSONArray().apply {
                     put(JSONObject().apply {
-                        put("role", "system")
-                        put("content", SYSTEM_PROMPT)
-                    })
-                    put(JSONObject().apply {
                         put("role", "user")
                         put("content", query)
                     })
                 }
 
                 val options = JSONObject().apply {
-                    put("force_tools", true)
                     put("max_tokens", 256)
                     put("temperature", 0.0)
                     put("top_p", 0.0)
                     put("tool_rag_top_k", 0)
-                    put("confidence_threshold", 0.0)
-                    put("auto_handoff", false)
                 }
+
+                android.util.Log.d(TAG, "Query: ${query.take(100)}")
+                android.util.Log.d(TAG, "Tools JSON (${toolsJson.length} chars): ${toolsJson.take(200)}")
 
                 val resultJson = cactusComplete(
                     modelHandle,
