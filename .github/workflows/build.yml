@@ -50,7 +50,9 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/cactus-compute/cactus.git /tmp/cactus
           cd /tmp/cactus
-          pip install -e .
+          pip install -r python/requirements.txt
+          pip install -e python/
+          export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973
           cactus build --android
           mkdir -p $GITHUB_WORKSPACE/app/src/main/jniLibs/arm64-v8a/
           cp android/libcactus_engine.so $GITHUB_WORKSPACE/app/src/main/jniLibs/arm64-v8a/
