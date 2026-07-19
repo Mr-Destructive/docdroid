@@ -24,10 +24,13 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Python 3.13
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: '3.12'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
@@ -43,45 +46,50 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Setup Cactus
+      - name: Build Cactus native library
         run: |
           git clone --depth 1 https://github.com/cactus-compute/cactus.git /tmp/cactus
           cd /tmp/cactus
-          bash -c "source ./setup && cactus build --android"
+          pip install -e .
+          cactus build --android
           mkdir -p $GITHUB_WORKSPACE/app/src/main/jniLibs/arm64-v8a/
           cp android/libcactus_engine.so $GITHUB_WORKSPACE/app/src/main/jniLibs/arm64-v8a/
+          echo "Native library built:"
+          ls -lh $GITHUB_WORKSPACE/app/src/main/jniLibs/arm64-v8a/
 
-      - name: Download Needle bundle
+      - name: Download Needle CQ4 model
         run: |
           mkdir -p $GITHUB_WORKSPACE/app/src/main/assets/needle
           cd /tmp
           wget -q "https://huggingface.co/Cactus-Compute/needle/resolve/main/needle-cq4.zip" -O needle-cq4.zip
           unzip -o needle-cq4.zip -d needle-bundle
           cp -r needle-bundle/* $GITHUB_WORKSPACE/app/src/main/assets/needle/
-          ls -la $GITHUB_WORKSPACE/app/src/main/assets/needle/
-
-      - name: Generate Gradle wrapper
-        run: gradle wrapper --gradle-version 8.11.1
+          echo "Model files:"
+          ls -lh $GITHUB_WORKSPACE/app/src/main/assets/needle/
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --no-daemon
+
       - name: Build Release APK
         run: ./gradlew assembleRelease --no-daemon
 
-      - name: Install build-tools
-        run: sdkmanager "build-tools;35.0.0"
-
       - name: Sign APK
         run: |
+          sdkmanager "build-tools;35.0.0"
           keytool -genkeypair -v -keystore /tmp/release.keystore \
             -alias docdroid -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass docdroid123 -keypass docdroid123 \
             -dname "CN=DocDroid, OU=Dev, O=DocDroid, L=Unknown, ST=Unknown, C=US"
           if [ -f app/build/outputs/apk/release/app-release-unsigned.apk ]; then
             cp app/build/outputs/apk/release/app-release-unsigned.apk /tmp/app-release.apk
-          else
+          elif [ -f app/build/outputs/apk/release/app-release.apk ]; then
             cp app/build/outputs/apk/release/app-release.apk /tmp/app-release.apk
+          else
+            echo "No release APK found, using debug APK"
+            cp app/build/outputs/apk/debug/app-debug.apk /tmp/app-release.apk
           fi
           ${ANDROID_HOME}/build-tools/35.0.0/zipalign -v 4 /tmp/app-release.apk /tmp/app-release-aligned.apk
           ${ANDROID_HOME}/build-tools/35.0.0/apksigner sign \
@@ -112,7 +120,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Print APK info
+      - name: Print build info
         run: |
           echo "=== Build Complete ==="
           ls -lh ${{ env.APK_PATH }}
