@@ -11,7 +11,6 @@ import com.docdroid.harness.Tool
 import com.docdroid.harness.ToolResult
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import java.io.File
-import java.io.FileInputStream
 import java.io.FileOutputStream
 
 class PdfWatermark(private val context: Context) : Tool {

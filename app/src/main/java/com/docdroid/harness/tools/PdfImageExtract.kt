@@ -2,15 +2,13 @@ package com.docdroid.harness.tools
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
+import android.graphics.pdf.PdfRenderer
+import android.os.ParcelFileDescriptor
 import com.docdroid.harness.Tool
 import com.docdroid.harness.ToolResult
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import org.apache.pdfbox.pdmodel.PDDocument
-import org.apache.pdfbox.rendering.PDFRenderer
 import java.io.File
 import java.io.FileOutputStream
-import javax.imageio.ImageIO
 
 class PdfImageExtract(private val context: Context) : Tool {
 
@@ -29,21 +27,33 @@ class PdfImageExtract(private val context: Context) : Tool {
                 return ToolResult.Error("File not found: $inputPath")
             }
 
-            val doc = PDDocument.load(inputFile)
-            val renderer = PDFRenderer(doc)
+            val pfd = ParcelFileDescriptor.open(inputFile, ParcelFileDescriptor.MODE_READ_ONLY)
+            val renderer = PdfRenderer(pfd)
             val outDir = resolveOutput(outputDir)
             outDir.mkdirs()
 
             val extractedFiles = mutableListOf<String>()
-            for (pageIndex in 0 until doc.numberOfPages) {
-                val image = renderer.renderImageWithDPI(pageIndex, 200f)
+            for (pageIndex in 0 until renderer.pageCount) {
+                val page = renderer.openPage(pageIndex)
+                val scale = 2f
+                val bitmap = Bitmap.createBitmap(
+                    (page.width * scale).toInt(),
+                    (page.height * scale).toInt(),
+                    Bitmap.Config.ARGB_8888
+                )
+                bitmap.eraseColor(android.graphics.Color.WHITE)
+                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+
                 val outFile = File(outDir, "page_${pageIndex + 1}.png")
                 FileOutputStream(outFile).use { fos ->
-                    javax.imageio.ImageIO.write(image, "png", fos)
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos)
                 }
+                bitmap.recycle()
+                page.close()
                 extractedFiles.add(outFile.name)
             }
-            doc.close()
+            renderer.close()
+            pfd.close()
 
             ToolResult.Success(
                 "Extracted ${extractedFiles.size} page images from ${inputFile.name}: ${extractedFiles.joinToString(", ")}",

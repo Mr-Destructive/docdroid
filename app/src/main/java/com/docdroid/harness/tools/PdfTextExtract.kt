@@ -1,11 +1,11 @@
 package com.docdroid.harness.tools
 
 import android.content.Context
+import android.graphics.pdf.PdfRenderer
+import android.os.ParcelFileDescriptor
 import com.docdroid.harness.Tool
 import com.docdroid.harness.ToolResult
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import org.apache.pdfbox.pdmodel.PDDocument
-import org.apache.pdfbox.text.PDFTextStripper
 import java.io.File
 
 class PdfTextExtract(private val context: Context) : Tool {
@@ -24,29 +24,38 @@ class PdfTextExtract(private val context: Context) : Tool {
                 return ToolResult.Error("File not found: $inputPath")
             }
 
-            val doc = PDDocument.load(inputFile)
-            val stripper = PDFTextStripper()
+            val pfd = ParcelFileDescriptor.open(inputFile, ParcelFileDescriptor.MODE_READ_ONLY)
+            val renderer = PdfRenderer(pfd)
+            val totalPages = renderer.pageCount
+            renderer.close()
+            pfd.close()
 
-            if (!pagesStr.equals("all", ignoreCase = true)) {
-                val pages = parsePages(pagesStr, doc.numberOfPages)
-                if (pages.isNotEmpty()) {
-                    stripper.startPage = pages.first()
-                    stripper.endPage = pages.last()
-                }
-            }
+            val sb = StringBuilder()
+            sb.appendLine("PDF: ${inputFile.name}")
+            sb.appendLine("Total pages: $totalPages")
+            sb.appendLine()
+            sb.appendLine("Note: Pure text extraction requires a PDF parsing library (PDFBox).")
+            sb.appendLine("Each page can be rendered as an image using the 'extract_images' tool.")
+            sb.appendLine("Page details:")
 
-            val text = stripper.getText(doc)
-            doc.close()
-
-            val preview = if (text.length > 500) {
-                text.take(500) + "\n... (${text.length} chars total)"
+            val pfd2 = ParcelFileDescriptor.open(inputFile, ParcelFileDescriptor.MODE_READ_ONLY)
+            val renderer2 = PdfRenderer(pfd2)
+            val pagesToRead = if (pagesStr.equals("all", ignoreCase = true)) {
+                (0 until totalPages).toList()
             } else {
-                text
+                parsePages(pagesStr, totalPages)
             }
 
-            ToolResult.Success(
-                "Extracted ${text.length} characters from ${inputFile.name}:\n$preview"
-            )
+            for (pageIndex in pagesToRead) {
+                val page = renderer2.openPage(pageIndex)
+                sb.appendLine("  Page ${pageIndex + 1}: ${page.width}x${page.height} pts")
+                page.close()
+            }
+
+            renderer2.close()
+            pfd2.close()
+
+            ToolResult.Success(sb.toString())
         } catch (e: Exception) {
             ToolResult.Error("Text extraction failed: ${e.message}", "extract_text")
         }
@@ -64,7 +73,7 @@ class PdfTextExtract(private val context: Context) : Tool {
                 if (page in 1..totalPages) pages.add(page)
             }
         }
-        return pages.distinct().sorted()
+        return pages.distinct().sorted().map { it - 1 }
     }
 
     private fun resolveFile(path: String): File {

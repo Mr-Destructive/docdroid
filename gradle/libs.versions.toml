@@ -27,9 +27,6 @@ activity-compose = { group = "androidx.activity", name = "activity-compose", ver
 coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
 coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 
-# PDF
-pdfbox = { group = "com.tom-roush", name = "pdfbox-android", version.ref = "pdfbox" }
-
 # JSON
 jackson-databind = { group = "com.fasterxml.jackson.core", name = "jackson-databind", version.ref = "jackson" }
 jackson-module-kotlin = { group = "com.fasterxml.jackson.module", name = "jackson-module-kotlin", version.ref = "jackson" }

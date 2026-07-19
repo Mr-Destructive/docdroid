@@ -1,13 +1,14 @@
 package com.docdroid.harness.tools
 
 import android.content.Context
+import android.graphics.pdf.PdfDocument
+import android.graphics.pdf.PdfRenderer
+import android.os.ParcelFileDescriptor
 import com.docdroid.harness.Tool
 import com.docdroid.harness.ToolResult
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import org.apache.pdfbox.multipdf.PDFCloneUtility
-import org.apache.pdfbox.pdmodel.PDDocument
-import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject
 import java.io.File
+import java.io.FileOutputStream
 
 class PdfCompress(private val context: Context) : Tool {
 
@@ -20,6 +21,7 @@ class PdfCompress(private val context: Context) : Tool {
                 ?: return ToolResult.Error("Missing 'input_path'")
             val outputPath = node.get("output_path")?.asText()
                 ?: return ToolResult.Error("Missing 'output_path'")
+            val quality = node.get("quality")?.asText()?.lowercase() ?: "medium"
 
             val inputFile = resolveFile(inputPath)
             if (!inputFile.exists()) {
@@ -27,21 +29,39 @@ class PdfCompress(private val context: Context) : Tool {
             }
 
             val originalSize = inputFile.length()
-            val doc = PDDocument.load(inputFile)
+            val scale = when (quality) {
+                "high" -> 1.5f
+                "low" -> 0.75f
+                else -> 1.0f
+            }
 
-            // Remove metadata
-            doc.documentInformation = null
+            val pfd = ParcelFileDescriptor.open(inputFile, ParcelFileDescriptor.MODE_READ_ONLY)
+            val renderer = PdfRenderer(pfd)
+            val totalPages = renderer.pageCount
 
-            // Save with compression
+            val doc = PdfDocument()
+            for (pageIndex in 0 until totalPages) {
+                val page = renderer.openPage(pageIndex)
+                val newWidth = (page.width * scale).toInt()
+                val newHeight = (page.height * scale).toInt()
+                val pageInfo = PdfDocument.PageInfo.Builder(newWidth, newHeight, pageIndex + 1).create()
+                val pdfPage = doc.startPage(pageInfo)
+                page.render(pdfPage.canvas, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                doc.finishPage(pdfPage)
+                page.close()
+            }
+            renderer.close()
+            pfd.close()
+
             val outputFile = resolveOutput(outputPath)
-            doc.save(outputFile.absolutePath)
+            FileOutputStream(outputFile).use { fos -> doc.writeTo(fos) }
             doc.close()
 
             val newSize = outputFile.length()
-            val reduction = ((1.0 - newSize.toDouble() / originalSize) * 100).toInt()
+            val reduction = if (originalSize > 0) ((1.0 - newSize.toDouble() / originalSize) * 100).toInt() else 0
 
             ToolResult.Success(
-                "Compressed ${inputFile.name}: ${originalSize / 1024} KB → ${newSize / 1024} KB (${reduction}% reduction)",
+                "Compressed ${inputFile.name}: ${originalSize / 1024} KB -> ${newSize / 1024} KB (${reduction}% change)",
                 outputFile.absolutePath
             )
         } catch (e: Exception) {

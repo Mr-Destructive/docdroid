@@ -1,12 +1,14 @@
 package com.docdroid.harness.tools
 
 import android.content.Context
+import android.graphics.pdf.PdfDocument
+import android.graphics.pdf.PdfRenderer
+import android.os.ParcelFileDescriptor
 import com.docdroid.harness.Tool
 import com.docdroid.harness.ToolResult
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import org.apache.pdfbox.multipdf.Splitter
-import org.apache.pdfbox.pdmodel.PDDocument
 import java.io.File
+import java.io.FileOutputStream
 
 class PdfSplit(private val context: Context) : Tool {
 
@@ -27,28 +29,41 @@ class PdfSplit(private val context: Context) : Tool {
                 return ToolResult.Error("File not found: $inputPath")
             }
 
-            val doc = PDDocument.load(inputFile)
-            val totalPages = doc.numberOfPages
+            val pfd = ParcelFileDescriptor.open(inputFile, ParcelFileDescriptor.MODE_READ_ONLY)
+            val renderer = PdfRenderer(pfd)
+            val totalPages = renderer.pageCount
 
-            val splitter = Splitter()
             val ranges = parsePageRanges(pageRanges, totalPages)
-            splitter.pageRange = ranges
-
             val outDir = resolveOutput(outputDir)
             outDir.mkdirs()
 
-            val pages = splitter.split(doc)
             val outputFiles = mutableListOf<String>()
-            for ((index, page) in pages.withIndex()) {
-                val outFile = File(outDir, "split_${index + 1}.pdf")
-                page.save(outFile.absolutePath)
-                page.close()
+            var fileIndex = 1
+
+            for (range in ranges) {
+                val doc = PdfDocument()
+                for (pageIndex in range) {
+                    val page = renderer.openPage(pageIndex)
+                    val pageInfo = PdfDocument.PageInfo.Builder(
+                        page.width, page.height, doc.pages.size + 1
+                    ).create()
+                    val pdfPage = doc.startPage(pageInfo)
+                    page.render(pdfPage.canvas, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                    doc.finishPage(pdfPage)
+                    page.close()
+                }
+                val outFile = File(outDir, "split_${fileIndex}.pdf")
+                FileOutputStream(outFile).use { fos -> doc.writeTo(fos) }
+                doc.close()
                 outputFiles.add(outFile.name)
+                fileIndex++
             }
-            doc.close()
+
+            renderer.close()
+            pfd.close()
 
             ToolResult.Success(
-                "Split $totalPages-page PDF into ${pages.size} files: ${outputFiles.joinToString(", ")}",
+                "Split $totalPages-page PDF into ${outputFiles.size} files: ${outputFiles.joinToString(", ")}",
                 outDir.absolutePath
             )
         } catch (e: Exception) {
@@ -56,19 +71,19 @@ class PdfSplit(private val context: Context) : Tool {
         }
     }
 
-    private fun parsePageRanges(ranges: String, totalPages: Int): List<Int> {
-        val pages = mutableListOf<Int>()
+    private fun parsePageRanges(ranges: String, totalPages: Int): List<List<Int>> {
+        val result = mutableListOf<List<Int>>()
         for (part in ranges.split(",")) {
             val trimmed = part.trim()
             if (trimmed.contains("-")) {
                 val (start, end) = trimmed.split("-").map { it.trim().toInt() }
-                pages.addAll(start.coerceAtLeast(1)..end.coerceAtMost(totalPages))
+                result.add((start.coerceAtLeast(1)..end.coerceAtMost(totalPages)).toList())
             } else {
                 val page = trimmed.toInt()
-                if (page in 1..totalPages) pages.add(page)
+                if (page in 1..totalPages) result.add(listOf(page))
             }
         }
-        return pages.distinct().sorted()
+        return result.map { it.map { p -> p - 1 } }
     }
 
     private fun resolveFile(path: String): File {

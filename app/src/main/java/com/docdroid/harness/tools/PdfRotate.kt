@@ -1,12 +1,14 @@
 package com.docdroid.harness.tools
 
 import android.content.Context
+import android.graphics.pdf.PdfDocument
+import android.graphics.pdf.PdfRenderer
+import android.os.ParcelFileDescriptor
 import com.docdroid.harness.Tool
 import com.docdroid.harness.ToolResult
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import org.apache.pdfbox.pdmodel.PDDocument
-import org.apache.pdfbox.pdmodel.PDPage
 import java.io.File
+import java.io.FileOutputStream
 
 class PdfRotate(private val context: Context) : Tool {
 
@@ -32,25 +34,58 @@ class PdfRotate(private val context: Context) : Tool {
                 return ToolResult.Error("File not found: $inputPath")
             }
 
-            val doc = PDDocument.load(inputFile)
-            val pages = if (pagesStr.equals("all", ignoreCase = true)) {
-                (0 until doc.numberOfPages).toList()
+            val pfd = ParcelFileDescriptor.open(inputFile, ParcelFileDescriptor.MODE_READ_ONLY)
+            val renderer = PdfRenderer(pfd)
+            val totalPages = renderer.pageCount
+            val pagesToRotate = if (pagesStr.equals("all", ignoreCase = true)) {
+                (0 until totalPages).toList()
             } else {
-                parsePages(pagesStr, doc.numberOfPages)
+                parsePages(pagesStr, totalPages)
             }
 
-            for (pageIndex in pages) {
-                val page = doc.getPage(pageIndex)
-                val currentRotation = page.rotation
-                page.rotation = (currentRotation + angle) % 360
+            val doc = PdfDocument()
+            for (pageIndex in 0 until totalPages) {
+                val page = renderer.openPage(pageIndex)
+                val pageInfo = PdfDocument.PageInfo.Builder(
+                    page.width, page.height, pageIndex + 1
+                ).create()
+                val pdfPage = doc.startPage(pageInfo)
+                val canvas = pdfPage.canvas
+
+                if (pageIndex in pagesToRotate) {
+                    canvas.save()
+                    when (angle) {
+                        90 -> {
+                            canvas.rotate(90f, page.width / 2f, page.height / 2f)
+                        }
+                        180 -> {
+                            canvas.rotate(180f, page.width / 2f, page.height / 2f)
+                        }
+                        270 -> {
+                            canvas.rotate(270f, page.width / 2f, page.height / 2f)
+                        }
+                    }
+                }
+
+                page.render(canvas, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+
+                if (pageIndex in pagesToRotate) {
+                    canvas.restore()
+                }
+
+                doc.finishPage(pdfPage)
+                page.close()
             }
+
+            renderer.close()
+            pfd.close()
 
             val outputFile = resolveOutput(outputPath)
-            doc.save(outputFile.absolutePath)
+            FileOutputStream(outputFile).use { fos -> doc.writeTo(fos) }
             doc.close()
 
             ToolResult.Success(
-                "Rotated ${pages.size} page(s) by ${angle}° in ${outputFile.name}",
+                "Rotated ${pagesToRotate.size} page(s) by ${angle}° in ${outputFile.name}",
                 outputFile.absolutePath
             )
         } catch (e: Exception) {

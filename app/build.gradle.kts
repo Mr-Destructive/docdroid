@@ -77,8 +77,7 @@ dependencies {
     implementation(libs.coroutines.core)
     implementation(libs.coroutines.android)
 
-    // PDF manipulation
-    implementation(libs.pdfbox)
+
 
     // JSON parsing
     implementation(libs.jackson.databind)

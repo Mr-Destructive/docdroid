@@ -1,11 +1,14 @@
 package com.docdroid.harness.tools
 
 import android.content.Context
+import android.graphics.pdf.PdfRenderer
+import android.graphics.pdf.PdfDocument
+import android.os.ParcelFileDescriptor
 import com.docdroid.harness.Tool
 import com.docdroid.harness.ToolResult
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import org.apache.pdfbox.multipdf.PDFMergerUtility
 import java.io.File
+import java.io.FileOutputStream
 
 class PdfMerge(private val context: Context) : Tool {
 
@@ -23,22 +26,43 @@ class PdfMerge(private val context: Context) : Tool {
                 return ToolResult.Error("Need at least 2 PDFs to merge")
             }
 
-            val merger = PDFMergerUtility()
+            val doc = PdfDocument()
+            var totalPages = 0
+
             for (path in inputPaths) {
                 val file = resolveFile(path)
                 if (!file.exists()) {
                     return ToolResult.Error("File not found: $path")
                 }
-                merger.addSource(file)
+
+                val pfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+                val renderer = PdfRenderer(pfd)
+
+                for (pageIndex in 0 until renderer.pageCount) {
+                    val page = renderer.openPage(pageIndex)
+                    val pageInfo = PdfDocument.PageInfo.Builder(
+                        page.width, page.height, totalPages + 1
+                    ).create()
+                    val pdfPage = doc.startPage(pageInfo)
+                    page.render(pdfPage.canvas, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                    doc.finishPage(pdfPage)
+                    page.close()
+                    totalPages++
+                }
+
+                renderer.close()
+                pfd.close()
             }
 
             val outputFile = resolveOutput(outputPath)
-            merger.destinationFileName = outputFile.absolutePath
-            merger.mergeDocuments(null)
+            FileOutputStream(outputFile).use { fos ->
+                doc.writeTo(fos)
+            }
+            doc.close()
 
             val sizeKb = outputFile.length() / 1024
             ToolResult.Success(
-                "Merged ${inputPaths.size} PDFs into ${outputFile.name} (${sizeKb} KB)",
+                "Merged ${inputPaths.size} PDFs ($totalPages pages) into ${outputFile.name} (${sizeKb} KB)",
                 outputFile.absolutePath
             )
         } catch (e: Exception) {
@@ -54,10 +78,7 @@ class PdfMerge(private val context: Context) : Tool {
 
     fun resolveOutput(path: String): File {
         val f = File(path)
-        if (f.isAbsolute) {
-            f.parentFile?.mkdirs()
-            return f
-        }
+        if (f.isAbsolute) { f.parentFile?.mkdirs(); return f }
         val out = File(context.filesDir, path)
         out.parentFile?.mkdirs()
         return out
